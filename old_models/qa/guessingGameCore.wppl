@@ -1,0 +1,237 @@
+var foreach = function(lst, fn) {
+  var foreach_ = function(i) {
+    if (i < lst.length) {
+      fn(lst[i]);
+      foreach_(i + 1);
+    }
+  };
+  foreach_(0);
+};
+
+var questionToNode = dp.cache(function(utterance){
+  var temp = qa.butLast(utterance).split("Is");
+  var node = temp[1].toLowerCase();
+  return node;
+});
+
+// Meaning of answer is locations of all cards mentioned
+var fast_taxonomyAnswerMeaning = dp.cache(function(utterance){
+  return function(world){
+    return world[utterance];
+  };
+});
+
+var slow_taxonomyAnswerMeaning = dp.cache(function(utterance){
+  var temp = utterance.split("@");
+  var node = temp[0];
+  var location = qa.butLast(temp[1]);
+  return function(world){
+    return world[node] == location; 
+  };
+});
+
+var isTaxonomyAnswer = dp.cache(function(qudSpace, x){
+  return (
+    _.includes(qudSpace, x)
+      ||
+      ((last(x) === '.') & (_.includes(qudSpace, qa.butLast(x).split("@")[0])))
+  );
+});
+
+// our model has 3 parameters: Q&A rationality control how strongly
+// optimizing agents; w controls to what extent participants draw from an
+// empirical prior (1) vs. a uniform prior (0) on saliency. 
+var QAmodel = function(type, domain, Qrationality, Arationality, w) {
+  var knowledge = qa.buildKnowledge(type, domain);
+  var unifTaxonomy = knowledge.unifTaxonomy;
+  var empTaxonomy = knowledge.empTaxonomy;
+  var qudSpace = knowledge.qudSpace;
+  var labelSpace = knowledge.labelSpace;
+    
+  var meaning = dp.cache(function(utterance, version){
+    var taxonomyAnswerMeaning = (version == 'fast' ? fast_taxonomyAnswerMeaning :
+				 slow_taxonomyAnswerMeaning);
+    return (isTaxonomyAnswer(qudSpace, utterance) ? taxonomyAnswerMeaning(utterance) :
+            utterance === 'null' ? function(w){return true;} :
+            console.error('unknown utterance: ' + utterance));
+  });
+  
+  // Takes a taxonomy object with saliency probabilities
+  // and picks one item from each label to be 'the salient one'
+  var sampleSalienceAssignment = function() {
+    var tax = flip(w) ? empTaxonomy : unifTaxonomy;
+    return mapObject(function(label, probObj) {
+      var vals = _.values(probObj);
+      var salientItem = categorical(vals, _.keys(probObj));
+      return salientItem;
+    }, tax);
+  };
+
+  // To cut down on computational complexity, we fix a location assignment
+  var slow_trueWorld = _.zipObject(qudSpace, _.range(4));
+  var slow_worldPrior = Infer({method: 'enumerate'}, function(){
+    var possibleSeq = uniformDraw(qa.permute(_.range(qudSpace.length)));
+    return _.fromPairs(map2(function(goal, i) {
+      return [goal, i];
+    }, qudSpace, possibleSeq));
+  });
+
+  var fast_trueWorld = _.zipObject(qudSpace, [true, true, true, true]);
+  var fast_worldPrior = Infer({method: 'enumerate'}, function(){
+    var trueSeq = _.range(qudSpace.length);
+    var possibleSeq = uniformDraw(qa.permute(_.range(qudSpace.length)));
+    return _.fromPairs(map2(function(i, j) {
+      return [qudSpace[i], i == j];
+    }, trueSeq, possibleSeq));
+  });
+  
+  var questionPrior = function() {
+    var v = uniformDraw(labelSpace);
+    return 'whereIs' + v.charAt(0).toUpperCase() + v.slice(1) + '?';
+  };
+  
+  var questionSpace = Infer({method: 'enumerate'}, function(){
+    return questionPrior();
+  }).support();
+  
+
+  var fast_answerPrior = Infer({method: 'enumerate'}, function() {
+    return uniformDraw(qudSpace);
+  });
+
+  var slow_answerPrior = Infer({method: 'enumerate'}, function() {
+    var loc = uniformDraw(_.range(4));
+    var leaf = uniformDraw(qudSpace);
+    return leaf + '@' + loc + ".";
+  });
+  
+  var makeGoalFromName = function(node) {
+    return function(world){
+      return world[node];
+    };
+  };
+
+  var qudPrior = function() {
+    return uniformDraw(qudSpace);
+  };
+
+  var QUDPosteriorFromMeaning = dp.cache(function(question) {
+    return Infer({method: 'enumerate'}, function() {
+      var node = questionToNode(question);
+      var salienceGuess = sampleSalienceAssignment();
+      return salienceGuess[node];
+    });
+  });
+  
+  var QUDPosteriorFromInference = dp.cache(function(question, version){
+    return Infer({method: 'enumerate'}, function() {
+      var qudName = qudPrior();
+      observe(Q('lit', qudName, version), question);
+      return qudName;
+    });
+  });
+
+  var interpreter = dp.cache(function(answer, version){
+    var worldPrior = version == 'fast' ? fast_worldPrior : slow_worldPrior;
+    return Infer({method: 'enumerate'}, function(){
+      var world = sample(worldPrior);
+      var answerMeaning = meaning(answer, version);
+      condition(answerMeaning(world));
+      return world;
+    });
+  });
+  
+  var makeTruthfulAnswerPrior = dp.cache(function(trueWorld, version) {
+    var answerPrior = version == 'fast' ? fast_answerPrior : slow_answerPrior;
+    return Infer({method: 'enumerate'}, function(){
+      var answer = sample(answerPrior);
+      factor(interpreter(answer, version).score(trueWorld));
+      return answer;
+    });
+  });
+
+  var getPriorProb = dp.cache(function(goal, version) {
+    var qud = makeGoalFromName(goal);
+    var worldPrior = version == 'fast' ? fast_worldPrior : slow_worldPrior;
+    return (version == 'slow' ?
+	    marginalize(worldPrior, function(world) {return qud(world);}) :
+	    RandomInteger({n: qudSpace.length})
+	   );
+  });  
+
+  var getSubsetOfWorlds = dp.cache(function(answer, goal, version) {
+    var qud = makeGoalFromName(goal);
+    var worldPrior = version == 'fast' ? fast_worldPrior : slow_worldPrior;
+    var likelihood = Infer({method: 'enumerate'}, function() {
+      var w = sample(worldPrior);
+      condition(meaning(answer, version)(w));
+      return qud(w);
+    }).score(qud(fast_trueWorld));
+    return RandomInteger({n: Math.round(1/Math.exp(likelihood))});
+  });
+
+  var getPosteriorProb = dp.cache(function(question, answer, goal, version, type) {
+    var qud = makeGoalFromName(goal);
+    var worldPrior = version == 'fast' ? Delta({v:fast_trueWorld}) : slow_worldPrior;
+    return Infer({method: 'enumerate'}, function() {
+      var world = sample(worldPrior);
+      observe(A(type, question, world, version), answer);
+      return qud(world);
+    });
+  });
+
+
+  var Q = dp.cache(function(type, goal, version) {
+    var worldPrior = version == 'fast' ? fast_worldPrior : slow_worldPrior;
+    return Infer({method: 'enumerate'}, function() {
+      var question = questionPrior();
+      var possibleAnswer = (
+	version == 'fast' ?
+	  A(type, question, fast_trueWorld, version) :
+	  Infer({method: 'enumerate'}, function() {
+	    var trueWorld = sample(worldPrior);
+	    return sample(A(type, question, trueWorld, version));
+	  })
+      );
+      var infGain = expectation(possibleAnswer, function(answer){
+        var prior = getPriorProb(goal, version);
+        var posterior = (version == 'fast' ? getSubsetOfWorlds(answer,goal,version) :
+			 getPosteriorProb(question, answer, goal, version, type));
+        return qa.KL(posterior, prior);
+      });
+      factor(Qrationality * infGain);
+      return question;
+    });
+  });
+
+  var A = dp.cache(function(type, question, trueWorld, version) {
+    var qudPosterior = (type === 'prag' ? QUDPosteriorFromInference(question, version) :
+			type === 'lit' ? QUDPosteriorFromMeaning(question) :
+			type === 'null' ? Delta({v: function(v) {return v;}}) :
+			console.error('type not recognized'));
+    var truthfulAnswerPrior = makeTruthfulAnswerPrior(trueWorld, version);
+    return Infer({method: 'enumerate'}, function(){
+      var qud = makeGoalFromName(sample(qudPosterior));
+      var answer = sample(truthfulAnswerPrior);
+      var utility = expectation(interpreter(answer, version), function(possibleWorld) {
+        return _.isEqual(qud(possibleWorld), qud(trueWorld));
+      });
+      factor(Arationality * Math.log(utility));      
+      return answer;
+    });
+  });
+
+  var runAnswererModel = dp.cache(function(question, answererType, version) {
+    return (version == 'fast' ? A(answererType, question, fast_trueWorld, version) :
+	    marginalize(A(answererType, question, slow_trueWorld, version),
+			function(answer) { return answer.split('@')[0] + '.'; }));
+  });
+  
+  return {
+    qudSpace : qudSpace,
+    questionSpace : questionSpace,
+    questioner : Q,
+    answerer : A,
+    runAnswererModel: runAnswererModel
+  };
+};

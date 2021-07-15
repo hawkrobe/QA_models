@@ -1,0 +1,15 @@
+{
+  "name": "qa",
+  "main": "qa.js",
+  "webppl": {
+    "wppl": [
+      "spatialModel.wppl",
+      "guessingGameCore.wppl",
+      "guessingGameWorldKnowledge.wppl"
+    ]
+  },
+  "dependencies": {
+    "babyparse": "*",
+    "lodash": "^4.17.13"
+  }
+}

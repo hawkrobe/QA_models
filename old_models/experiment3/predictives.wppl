@@ -1,0 +1,51 @@
+var getQuestionerPredictions = function(questionerType, bestQRationality, bestARationality, bestAnswerCost) {
+  var model = SpatialModel(bestQRationality, bestARationality, bestAnswerCost);
+  var questionerData = qa.readCSV('../qa/questionFromMongo_qualitative.csv');
+  var questioner = model.questioner;
+  globalStore.predictives = [];
+  foreach(questionerData, function(datum) {
+    var rawState = JSON.parse(datum['gridState']);
+    var state = {'safe' : sort(rawState['safe']),
+		 'unsafe' : sort(rawState['unsafe'])};
+    var goal = datum['goal'] == 'columns' ? ['1', '2', '3'] : ['A', 'B', 'C'];
+    var prediction = questioner(questionerType, goal, state);
+    foreach(prediction.support(), function(s){
+      var strippedQuestion = s.split('_')[1];
+      var newPair = _.extend({}, datum, {modelOption: strippedQuestion, modelScore : prediction.score(s)});
+      console.log(globalStore.predictives.length);
+      globalStore.predictives = globalStore.predictives.concat(newPair);
+    });
+  });
+  return globalStore.predictives;
+};
+
+// qa.writeCSV(getQuestionerPredictions('explicit', 31, 1, 0.1), './bdaOutput/questionerPredictives_explicit.json');
+qa.writeCSV(getQuestionerPredictions('pragmatic', 29, 3.1, 2.5), './bdaOutput/questionerPredictives_pragmatic.json');
+
+var getAnswererPredictions = function(answererType, bestQRationality, bestARationality, bestAnswerCost) {
+  var model = SpatialModel(bestQRationality, bestARationality, bestAnswerCost);
+  var answererData = qa.readCSV('../qa/answerFromMongo_fixed.csv');//qa.readCSV('../../data/experiment3/questionFromMongo_clean.csv');
+  var answerer = model.answerer;
+  globalStore.predictives = [];
+  foreach(answererData, function(datum) {
+    var rawState = JSON.parse(datum['gridState']);
+    var state = {'safe' : sort(rawState['safe']),
+		 'unsafe' : sort(rawState['unsafe'])};
+    var world = JSON.parse(datum['underlyingWorld']);
+    var question = 'is_' + datum['cellAskedAbout'] + '_safe?';
+    var trueAnswer = map(function(v) {return v + '_' + world[v]},
+    			 JSON.parse(datum['answer']));
+    var prediction = answerer(answererType, question, world, state);
+    
+    foreach(prediction.support(), function(s){
+      var strippedAnswer = map(function(v) {return v.split('_')[0]}, s);
+      var newPair = _.extend({}, datum, {modelOption: strippedAnswer, modelScore : prediction.score(s)});
+      console.log(globalStore.predictives.length)
+      globalStore.predictives = globalStore.predictives.concat(newPair);
+    });
+  });
+  return globalStore.predictives;
+};
+
+//qa.writeCSV(getAnswererPredictions('explicit', 19, 11, 0.1), './bdaOutput/answererPredictives_explicit.json');
+//qa.writeCSV(getAnswererPredictions('pragmatic', 59, 2.7, 0.9), './bdaOutput/answererPredictives_pragmatic.json');
