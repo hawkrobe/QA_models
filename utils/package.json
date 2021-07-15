@@ -1,0 +1,11 @@
+{
+  "name": "utils",
+  "main": "utils.js",
+  "webppl": {
+    "wppl": []
+  },
+  "dependencies": {
+    "babyparse": "*",
+    "lodash": "^4.17.13"
+  }
+}
