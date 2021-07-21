@@ -89,7 +89,7 @@ var relevanceProjection = function(beliefs, context) {
     var action = uniformDraw(context.actions);
     var world = sample(beliefs);
     var decisionProblem = context.decisionProblem;
-    factor(Math.exp(decisionProblem(world, action)));
+    factor(Math.log(decisionProblem(world, action)));
     return action;
   });
 };
