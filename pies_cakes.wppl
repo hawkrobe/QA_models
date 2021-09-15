@@ -7,6 +7,8 @@ var butLast = function(xs){
 };
 
 var KL = function(dist1, dist2){
+  console.log(dist1)
+  console.log(dist2)
   var values = dist1.support();
   return sum(map(function(value){
     var scoreP = dist1.score(value);
@@ -38,12 +40,13 @@ var params = {
 };
 
 var bakedGoods = ['raspPie', 'raspCake', 'lemonPie', 'lemonCake'];
+
+// add possibility to encode background knowledge of number k of available goods
 var setsOfBakedGoods = map(
   function(v){return v.join('+');},
-  // add possibility to encode background knowledge of number k of available goods
-  filter(function(x) {return x.length <= 4}, powerset(bakedGoods))
+  filter(function(x) {return x.length <= 4;}, powerset(bakedGoods))
 );
-// console.log(setsOfBakedGoods);
+
 var pieCakeContext = {
   // worlds include all possible sub-sets of 0 < k < N pies and cakes
   worlds : setsOfBakedGoods,
@@ -59,12 +62,11 @@ var pieCakeContext = {
     {type: 'polar-disjunct', queried: ['raspCake'], text: 'anyRaspCake?'},
     {type: 'polar-disjunct', queried: ['lemonPie', 'raspPie'], text: 'anyPie?'},
     {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake'], text: 'anyCake?'},
-    {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonPie', 'raspPie'], text: 'anything?'},
-    // MF additional disjunctions
     {type: 'polar-disjunct', queried: ['lemonPie', 'lemonCake'], text: 'anyLemon?'},
     {type: 'polar-disjunct', queried: ['raspPie', 'raspCake'], text: 'anyRaspberry?'},
     {type: 'polar-disjunct', queried: ['lemonPie', 'raspCake'], text: 'lemonPieOrRaspCake?'},
     {type: 'polar-disjunct', queried: ['lemonCake', 'raspPie'], text: 'lemonCakeOrRaspPie?'},
+    {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonPie', 'raspPie'], text: 'anything?'},
     {type: 'wh', queried: ['lemonCake', 'raspCake'], text: 'whichCakes?'},
     {type: 'wh', queried: ['lemonPie', 'raspPie'], text: 'whichPies?'},
     {type: 'wh', queried: ['lemonPie', 'lemonCake', 'raspPie', 'raspCake'], text: 'which?'},
@@ -79,13 +81,12 @@ var pieCakeContext = {
   decisionProblem: function(w, a) {
     return _.includes(w, a) ? (a == 'raspPie' ? 5 : a == 'lemonCake' ? 4 : 1) : 0.0000001;
   },
-
+  
   meaning: function(world, question, response) {
     if(response == '') {
       // assume silence has null meaning
       return true;
-    }
-    if(question.type == 'polar-disjunct') {
+    } else if(question.type == 'polar-disjunct') {
       // assume simplest meaning: 'yes' is true if any item in
       // question is available o.w. 'no' is true
       return (response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
@@ -116,37 +117,38 @@ var pieCakeContext = {
 };
 
 // amended context with unbiased questioner beliefs and no preferences over any baked good
-var pieCakeContextUnbiasedNoPref = extend(
-  pieCakeContext,
-  {
-    // respondant knows true answer
-    respondantBeliefs: Delta({v: 'lemonCake'}),
-    // no preferences over baked goods
-    decisionProblem: function(w, a) {
-      return _.includes(w, a) ? 1 : 0.0000001;
-    }
+var pieCakeContextUnbiasedNoPref = extend(pieCakeContext, {
+  // respondant knows true answer
+  respondantBeliefs: Delta({v: 'lemonCake'}),
+  
+  // no preferences over baked goods
+  decisionProblem: function(w, a) {
+    return _.includes(w, a) ? 1 : 0.0000001;
   }
-)
+});
 
 // amended context with biased questioner beliefs and no preferences over any baked good
-var pieCakeContextBiasedNoPref = extend(
-  pieCakeContextUnbiasedNoPref,
-  {
-    // assume questioner is virtually certain that they have either raspberry pie
-    // or lemon cake (but not both)
-    questionerBeliefs: Categorical({
-      vs: setsOfBakedGoods,
-      ps: map(
-        function (x) {
-          return x == 'raspPie' ? 1000 : x == 'lemonCake' ? 1000 : 1
-        },
-        setsOfBakedGoods
-      )
-    })
-  }
-)
+var pieCakeContextBiasedNoPref = extend(pieCakeContextUnbiasedNoPref, {
+  // assume questioner is virtually certain that they have either raspberry pie
+  // or lemon cake (but not both)
+  questionerBeliefs: Categorical({
+    vs: setsOfBakedGoods,
+    ps: map(
+      function (x) {
+        return x == 'raspPie' ? 1000 : x == 'lemonCake' ? 1000 : 1
+      },
+      setsOfBakedGoods
+    )
+  })
+});
 
-var abcdWorlds = ['a', 'b', 'c', 'd', 'e', 'f']
+var pieCakeContextBiasedPref = extend(pieCakeContextBiasedNoPref, {
+  decisionProblem: function(w, a) {
+    return _.includes(w, a) ? (a == 'raspPie' ? 5 : a == 'lemonCake' ? 4 : 1) : 0.0000001;
+  },
+});
+
+var abcdWorlds = ['a', 'b', 'c', 'd', 'e', 'f'];
 var neutralContext = {
   // worlds include all possible sub-sets of 0 < k < N pies and cakes
   worlds : abcdWorlds,
@@ -204,18 +206,15 @@ var neutralContext = {
 
 // response cost is proportional to length in words
 var cost = function(response) {
-  // MF: fixed error and added parameter
   return params.costWeight * (response.split('+').length - 1);
 };
 
-// weight possible actions proportional
+// weight possible actions proportional to reward
 var relevanceProjection = function(beliefs, context) {
   return Infer({method: 'enumerate'}, function() {
     var action = uniformDraw(context.actions);
     var world = sample(beliefs);
     var decisionProblem = context.decisionProblem;
-    // console.log(world, action);
-    // console.log(Math.log(decisionProblem(world, action)));
     factor(Math.log(decisionProblem(world, action)));
     return action;
   });
@@ -232,19 +231,24 @@ var updateBeliefs = function(beliefs, question, response, context) {
   });
 };
 
-// agents weigh (1) general epistemic goal, (2) action-oriented goal, and (3) production cost
-var utility = function(type, utterance, beliefs1, beliefs2, context) {
+var questionUtility = function(utterance, beliefs, context) {
+  // questioner wants to *maximize* expected payoff under decision problem
+  var decisionProblem = context.decisionProblem;
+  var actionPolicy = relevanceProjection(beliefs, context);
+  var actionUtility = expectation(actionPolicy, function(action) {
+    // weight possible actions proportional to reward
+    return expectation(beliefs, function(world) {
+      return decisionProblem(world, action);
+    });
+  });
+  return actionUtility - cost(utterance);
+};
+
+var answerUtility = function(utterance, beliefs1, beliefs2, context) {
   // respondant wants to *minimize* KL b/w beliefs (bringing closer to own belief)
-  // questioner wants to *maximize* KL b/w old & new beliefs (asking informative Q)
-  var signFlip = type == 'R0' ? -1 : 1;
-  var epistemicUtility = KL(beliefs1, beliefs2) * signFlip;
-  var actionUtility = KL(relevanceProjection(beliefs1, context),
-                         relevanceProjection(beliefs2, context)) * signFlip;
-//   console.log(type + ' considering utterance: ', utterance);
-//   console.log('epistemic term:', epistemicUtility);
-//   console.log('action-specific term:', actionUtility);
-//   console.log('cost term:', cost(utterance));
-//   console.log('--------------');
+  var epistemicUtility = -KL(beliefs1, beliefs2);
+  var actionUtility = -KL(relevanceProjection(beliefs1, context),
+                          relevanceProjection(beliefs2, context));
   return ((1 - params.relevanceBeta) * epistemicUtility
           + params.relevanceBeta * actionUtility
           - cost(utterance));
@@ -254,11 +258,9 @@ var R0 = cache(function(question, context) {
   var getLicensedResponses = context.getLicensedResponses;
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(getLicensedResponses(question));
-//     console.log(response);
     var ownBeliefs = context.respondantBeliefs;
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-//     console.log('updated beliefs', otherBeliefs);
-    factor(params.respondantAlpha * utility('R0', response, ownBeliefs, otherBeliefs, context));
+    factor(params.respondantAlpha * answerUtility(response, ownBeliefs, otherBeliefs, context));
     return response;
   });
 });
@@ -272,7 +274,7 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context) {
     var pragmaticResponse = R0(question, extend(context, {
       respondantBeliefs: Delta({v: world})
     }));
-    observe(pragmaticResponse,response)
+    observe(pragmaticResponse, response);
     return world;
   });
 };
@@ -280,16 +282,17 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context) {
 var Q1 = function(context) {
   return Infer({method: 'enumerate'}, function(){
     var question = uniformDraw(context.questions);
-    // console.log('considering question', question);
+    console.log(question);
     var expectedUtility = expectation(context.questionerBeliefs, function(trueWorld) {
-      // console.log('in possible world', trueWorld);
       var possibleResponses = R0(question, extend(context, {
         respondantBeliefs: Delta({v: trueWorld})
       }));
       return expectation(possibleResponses, function(response) {
         var currBeliefs = context.questionerBeliefs;
         var updatedBeliefs = updateBeliefsPragmatic(currBeliefs, question, response, context);
-        return utility('Q1', question.text, updatedBeliefs, currBeliefs, context);
+        console.log('under updated beliefs', updatedBeliefs);
+        console.log('expected utility is', questionUtility(question.text, updatedBeliefs, context));
+        return questionUtility(question.text, updatedBeliefs, context);
       });
     });
     factor(params.questionerAlpha * expectedUtility);
@@ -327,20 +330,26 @@ var Q1 = function(context) {
 // var whichThingQuestion = pieCakeContextUnbiasedNoPref.questions[13];
 // console.log(R0(whichThingQuestion, pieCakeContextUnbiasedNoPref));
 
-console.log('====================');
-console.log('Q1 test, unbiased, w/ preferences');
-console.log('====================');
-viz(Q1(pieCakeContext))
+// console.log('====================');
+// console.log('Q1 test, unbiased, w/ preferences');
+// console.log('====================');
+// console.log(Q1(pieCakeContext))
 
 console.log('====================');
-console.log('Q1 test, biased, w/o preferences');
+console.log('Q1 test, biased, w/ preferences');
 console.log('====================');
-viz(Q1(pieCakeContextBiasedNoPref))
+console.log(Q1(pieCakeContextBiasedPref))
 
-console.log('====================');
-console.log('Q1 test, UNbiased, w/o preferences');
-console.log('Expected: higher prob of "which" than w/ bias ');
-console.log('====================');
-viz(Q1(pieCakeContextUnbiasedNoPref))
+// console.log('====================');
+// console.log('Q1 test, biased, w/o preferences');
+// console.log('====================');
+// console.log(Q1(pieCakeContextBiasedNoPref))
 
-viz(Q1(neutralContext))
+
+// console.log('====================');
+// console.log('Q1 test, UNbiased, w/o preferences');
+// console.log('Expected: higher prob of "which" than w/ bias ');
+// console.log('====================');
+// console.log(Q1(pieCakeContextUnbiasedNoPref))
+
+// console.log(Q1(neutralContext))
