@@ -18,16 +18,20 @@ run_plot_model <- function (context_name = "pieCakeContext", questionerUtilFct =
     geom_col(fill = "#505B55") + coord_flip() +
     xlab("") +
     ylab("") +
+    ggtitle(context_name) + 
     theme_aida()
 
   factor = 3
 
   ggsave(filename = str_c("pics/results-", context_name, ".pdf"), width = 16/factor, height = 9/factor)
 
+  output
+  
 }
 
 run_plot_model("pieCakeContextMinimal")
 run_plot_model("pieCakeContextMinimalWithPreferences")
 run_plot_model("pieCakeContext")
+run_plot_model("pieCakeContextAdditivePreferences")
 run_plot_model("pieCakeContextBiasedNoPref")
 run_plot_model("pieCakeContextUnbiasedNoPref")
