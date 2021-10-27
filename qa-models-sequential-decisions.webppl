@@ -14,7 +14,7 @@ var KL = function(dist1, dist2){
     var probP = Math.exp(scoreP);
     var probQ = Math.exp(scoreQ);
     return (probP == 0.0 ? 0.0 :
-            probQ == 0.0 ? 1000:
+            probQ == 0.0 ? 1000000:
             probP * (scoreP - scoreQ));
   }, values));
 };
@@ -44,10 +44,10 @@ var powerset = function(set) {
 };
 
 var params = {
-  respondantAlpha : 3,
+  respondantAlpha : 0.0001,
   questionerAlpha : 3,
-  relevanceBeta: 1, // beta=1 for only action-utility
-  costWeight: 1
+  relevanceBeta: 0, // beta=1 for only action-utility
+  costWeight: 0
 };
 
 var bakedGoods = ['raspPie', 'raspCake', 'lemonPie', 'lemonCake'];
@@ -158,18 +158,18 @@ var pieCakeContext = {
 
   // questions include yes/no question for each baked good
   questions: [
-    {type: 'polar-disjunct', queried: ['lemonPie'], text: 'Lemon pie?'},
-    {type: 'polar-disjunct', queried: ['lemonCake'], text: 'Lemon cake?'},
-    {type: 'polar-disjunct', queried: ['raspPie'], text: 'Raspberry pie?'},
-    {type: 'polar-disjunct', queried: ['raspCake'], text: 'Raspberry cake?'},
-    {type: 'polar-disjunct', queried: ['lemonPie', 'raspPie'], text: 'Pie?'},
-    {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake'], text: 'Cake?'},
+    {type: 'single-item', queried: ['lemonPie'], text: 'Lemon pie?'},
+    {type: 'single-item', queried: ['lemonCake'], text: 'Lemon cake?'},
+    {type: 'single-item', queried: ['raspPie'], text: 'Raspberry pie?'},
+    {type: 'single-item', queried: ['raspCake'], text: 'Raspberry cake?'},
+    {type: 'polar-disjunct', queried: ['lemonPie', 'raspPie', 'lemonPie+raspPie'], text: 'Pie?'},
+    {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonCake+raspCake'], text: 'Cake?'},
     {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonPie', 'raspPie'], text: 'Anything?'},
     // MF additional disjunctions
-    {type: 'polar-disjunct', queried: ['lemonPie', 'lemonCake'], text: 'Anything w/ lemon?'},
-    {type: 'polar-disjunct', queried: ['raspPie', 'raspCake'], text: 'Anything w/ raspberry?'},
-    {type: 'polar-disjunct', queried: ['lemonPie', 'raspCake'], text: 'LP or RC?'},
-    {type: 'polar-disjunct', queried: ['lemonCake', 'raspPie'], text: 'RP or LC?'},
+    {type: 'polar-disjunct', queried: ['lemonPie', 'lemonCake', 'lemonPie+lemonCake'], text: 'Anything w/ lemon?'},
+    {type: 'polar-disjunct', queried: ['raspPie', 'raspCake', 'raspPie+raspCake'], text: 'Anything w/ raspberry?'},
+    {type: 'polar-disjunct', queried: ['lemonPie', 'raspCake', 'lemonPie+raspCake'], text: 'LP or RC?'},
+    {type: 'polar-disjunct', queried: ['lemonCake', 'raspPie', 'lemonCake+raspPie'], text: 'RP or LC?'},
     {type: 'wh', queried: ['lemonCake', 'raspCake'], text: 'Which cakes?'},
     {type: 'wh', queried: ['lemonPie', 'raspPie'], text: 'Which pies?'},
     {type: 'wh', queried: ['lemonPie', 'lemonCake', 'raspPie', 'raspCake'], text: 'Which goods?'},
@@ -177,12 +177,12 @@ var pieCakeContext = {
 
   // assume questioner is uncertain but answerer has Delta on true world (e.g. shopkeep)
   questionerBeliefs: Categorical({vs: setsOfBakedGoods}),
-  respondantBeliefs: Delta({v: 'lemonPie+lemonCake'}),
+  respondantBeliefs: Delta({v: 'lemonCake'}),
 
   // raspberry pie is #1 preference (U=5), lemon cake is #2 preference (U=4).
   // otherwise U=1 if whatever you order is in stock and 0 if it's not in stock
   decisionProblem: function(w, a) {
-    return _.includes(w, a) ? (a == 'raspPie' ? 5 : a == 'lemonCake' ? 4 : 1) : 0.0000001;
+    return _.includes(w, a) ? (a == 'raspPie' ? 5 : a == 'lemonCake' ? 3 : 1) : 0.0000001;
   },
 
   meaning: function(world, question, response) {
@@ -190,12 +190,23 @@ var pieCakeContext = {
       // assume silence has null meaning
       return true;
     }
+     if(question.type == 'single-item') {
+      // assume simplest meaning: 'yes' is true if any item in
+      // question is available o.w. 'no' is true
+      return (
+        response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+        response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+        console.error('Not a valid response to question:', question, response));
+    } else
     if(question.type == 'polar-disjunct') {
       // assume simplest meaning: 'yes' is true if any item in
       // question is available o.w. 'no' is true
-      return (response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
-              response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
-              console.error('unknown response', response));
+      return (
+        response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+        response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+        all(function(item) {
+          return _.includes(world.split('+'), item);
+        }, response.split('+')));
     } else if(question.type == 'wh') {
       // assume response is true when the shop contains every mentioned item
       return all(function(item) {
@@ -208,9 +219,13 @@ var pieCakeContext = {
 
   // R0 chooses among responses licensed by the question
   getLicensedResponses: function(question) {
-    if(question.type == 'polar-disjunct') {
+    if(question.type == 'single-item') {
       // by definition polar questions require 'yes'/'no' answer
       return ['yes', 'no'];
+    } else if(question.type == 'polar-disjunct') {
+      // by definition polar questions require 'yes'/'no' answer
+      var answers = ['yes', 'no'].concat(question.queried);
+      return answers;
     } else if(question.type == 'wh') {
       // 'wh' questions allow you to say any set of queried items
       return map(function(v){return v.join('+');}, powerset(question.queried));
@@ -219,6 +234,21 @@ var pieCakeContext = {
     }
   }
 };
+
+// amended context with feature-based (additive) preferences
+var pieCakeContextAdditivePreferences = extend(
+  pieCakeContext,
+  {
+    // feature-additive preferences: pie = 3, cake = 2, rasp = 6, lemon = 4;
+    decisionProblem: function(w, a) {
+      return _.includes(w, a) ? (a == 'raspPie' ? 9 :
+                                 a == 'raspCake' ? 8 :
+                                 a == 'lemonPie' ? 7 :
+                                 a == 'lemonCake' ? 6 : console.error('unknown action')
+                                ) : 0.0000001;
+    }
+  }
+)
 
 // amended context with unbiased questioner beliefs and no preferences over any baked good
 var pieCakeContextUnbiasedNoPref = extend(
@@ -353,13 +383,28 @@ var Q1 = function(context) {
   });
 };
 
-console.log(myDF);
 
+console.log(myDF);
 var context =
     myDF[0].context == 'pieCakeContextMinimal' ? pieCakeContextMinimal :
     myDF[0].context == 'pieCakeContextMinimalWithPreferences' ? pieCakeContextMinimalWithPreferences :
     myDF[0].context == 'pieCakeContext' ? pieCakeContext :
+    myDF[0].context == 'pieCakeContextAdditivePreferences' ? pieCakeContextAdditivePreferences :
     myDF[0].context == 'pieCakeContextBiasedNoPref' ? pieCakeContextBiasedNoPref :
     myDF[0].context == 'pieCakeContextUnbiasedNoPref' ? pieCakeContextUnbiasedNoPref :
     false
 Q1(context)
+
+// var context = pieCakeContext;
+// var question = context.questions[5];
+// var world = setsOfBakedGoods[10];
+// console.log('world', world);
+// console.log('question: ', question.text)
+// var responses = context.getLicensedResponses
+// console.log('all responses: ', responses(question))
+// var response = responses(question)[1]
+// console.log('response: ', response)
+// var meaning = context.meaning
+// console.log('truth value: ', meaning(world,question,response));
+
+// Q1(context)

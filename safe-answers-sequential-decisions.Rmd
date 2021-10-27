@@ -1,0 +1,209 @@
+---
+title: "What's a good question?"
+subtitle: "Safe answers & sequential decisions"
+author: ""
+date: "2021-10-05"
+output: 
+  html_document:
+  pandoc_args: --webtex
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, cache = F}
+library(rwebppl)
+library(tidyverse)
+library(aida) # remotes::install_github("michael-franke/aida-package")
+```
+
+```{r echo = F}
+run_plot_model <- function (context_name = "pieCakeContext", questionerUtilFct = "KL") {
+  webPPL_data = tibble('context' = context_name, 'questionerUtilFct' = questionerUtilFct)
+  webppl(
+    program_file = "qa-models-sequential-decisions.webppl",
+    data = webPPL_data,
+    data_var = "myDF"
+  ) -> output
+
+  out_plot <- output %>%
+    as_tibble() %>%
+    mutate(support = fct_reorder(support, prob)) %>%
+    ggplot(aes(x = support, y = prob)) +
+    geom_col(fill = "#505B55") + coord_flip() +
+    xlab("") +
+    ylab("") +
+    ggtitle(context_name) + 
+    theme_aida()
+
+  factor = 3
+
+  # ggsave(filename = str_c("pics/results-", context_name, ".pdf"), width = 16/factor, height = 9/factor)
+
+  out_plot
+  
+}
+```
+
+
+## Model specification
+
+### Base-level respondent 
+
+The base-level respondent is a literal, true and safe respondent. They choose any true and safe answer with equal probability.
+Not even utterance cost is taken into account.
+
+The base-level respondent can be characterized as a radically uncertain agent who knows nothing about the context or the interlocutor, except that the interlocutor is uncertain about the question.
+Radical uncertainty is an established concept in theoretical economics.
+It means that the agent is unable to even assign a flat probability distribution over contingencies; the agent rather has a (non-weighted) (convex compact) set of probability distributions over world states (here: the interlocutor's epistemic states compatible with uncertainty about the question asked). 
+Radical uncertainty is useful to cope with Ellberg paradoxes, for instance.
+In decision situations, radically uncertain agents rationally choose actions following a maximin strategy (e.g., Gilboa & Schmeidler 1989, Journal of Mathematical Economics).
+If we assume that the payoff function for the base-level respondent gives payoff 1 for true informative answers and 0 any other answers the maximin strategy is to choose any true and safe answer.
+
+To see this, consider three logically independent propositions $A$, $B$ and $C$.
+The question asked is $?(A \vee B)$.
+Uncertainty about that question entails that (i) the questioner does not believe that $A$ is true, neither that $B$ is true, and that (i) the questioner is uncertain about at least one of them.
+Schematically, there are three possible situations: $(u,u)$, $(u,0)$ and $(0,u)$ where the pair shows whether $A$ or $B$ is believed true (1), uncertain ($u$) or believed false ($0$).
+Each of these three types of situations is compatible with any belief in $C$ (from logical independence).
+Consider one case where the agent knows that $A$ is true and another where $A \vee B$ is false but $C$ is true.
+In both situations the true polar answers "yes" and "no" have a minimum payoff of 1 (by assumption that the questioner doesn't know the answer to the question asked).
+In situation 1, saying $A$ has a minimum payoff of 1; it is always informative.
+In situation 2, saying $C$ has a minimum payoff of 0; there are situations where it is not.
+Hence, the maximin agent is indifferent between "yes" and "yes, in fact A" in situation 1, but only uses "no" and not "No, in fact C" in situation 2.
+
+### Questioner
+
+The questioner is a sequential decision maker: they choose a question based on a soft-max policy based on the expected utility of the question.
+The expected utility of a question is the expected value of the decision problem after receiving an answer. 
+The value of a decision problem is the expected utility of a decision policy.
+The decision policy assumed here is utility proportional choice.
+
+### Parameters
+
+Utterance cost is set to zero (for clarity of results).
+The base-level respondent is therefore parameter free.
+The questioner's softmax parameter is set to 3.
+
+## Minimal base case
+
+Quinn knows that there is only one available item.
+Quinn has no preferences and no *a priori* beliefs.
+Questions are therefore restricted to item-questions and the most general 'which' question.
+
+```{r, echo = F}
+run_plot_model("pieCakeContextMinimal")
+```
+
+## Minimal w/ preferences
+
+Quinn knows that there is only one available option.
+Questions are therefore restricted to item-questions and the most general 'which' question.
+Quinn's preferences are:
+
+- RP = 5
+- LC = 3
+- SC = 1
+- AS = 1
+
+We expect that $P(RP?) > P(LC?) > P(SC?) = P(AS?)$.
+
+```{r echo = F}
+run_plot_model("pieCakeContextMinimalWithPreferences")
+```
+
+
+## Richer neutral context
+
+Quinn knows that any $k$ items might be available.
+Available questions contain (two-place) disjunctive questions and feature-questions (e.g., "Do you have cake?").
+Notice that feature-questions are essentially disjunctive as well, since we assume four items which are combined of two feature with two values each.
+Quinn has unbiased beliefs, but has numerical preferences as before:
+
+- RP = 5
+- LC = 3
+- RC = 1
+- LP = 1
+
+We expect the same order among single-polar questions as before: $P(RP?) > P(LC?) > P(SC?) = P(AS?)$.
+We also expect that the odds for the *which*-question against polar question "RP?" are decreased in comparison to the previous more minimal case.
+We also expect that the disjunctive question "RP or LC?" is the best among all disjunctive and feature-questions.
+
+All of that is predictedby the model:
+
+```{r echo = F}
+run_plot_model("pieCakeContext")
+```
+
+## Feature-based preferences
+
+If preferences over outcomes are the result of simple additive preferences over features, we have clear intuitions regarding which feature-related question to ask.
+In particular, if one feature contributes more to overall utility than another, it is intuitively more natural to ask for the preferred feature.
+
+Assume that Quinn has the following preferences.
+Overall, the topping (raspberry vs lemon) contributes more to Quinn's payoffs than the type of baked good (pie vs cake).
+Each feature-value contributes the following (additive) score to Quinn's payoff:
+
+- raspberry = 6
+- lemon = 4
+- pie = 3
+- cake = 2
+
+Together this yields the following utils:
+
+- raspberry pie = 9
+- raspberry cake = 8
+- lemon pie = 7
+- lemon cake = 6
+
+
+```{js, echo = F}
+// amended context with feature-based (additive) preferences
+var pieCakeContextAdditivePreferences = extend(
+  pieCakeContext,
+  {
+    // feature-additive preferences: pie = 3, cake = 2, rasp = 6, lemon = 4;
+    decisionProblem: function(w, a) {
+      return _.includes(w, a) ? (
+        a == 'raspPie' ? 9 :
+          a == 'raspCake' ? 8 :
+          a == 'lemonPie' ? 7 :
+          a == 'lemonCake' ? 6 : 
+          console.error('unknown action')
+      ) : 0.0000001;
+    }
+  }
+)
+```
+
+Intuitively, we expect the following order on feature-related questions.
+First, we expect to see questions for the preferred feature value to be more likely than questions for the non-preferred feature-value:
+
+$$P(\text{raspberry?}) > P(\text{lemon?})$$
+
+$$P(\text{pie?}) > P(\text{cake?})$$
+
+Second, we expect to see (the most probable) questions after the "more relevant" feature to be more likely than those of a less relevant feature:
+
+$$P(\text{raspberry?}) > P(\text{pie?})$$
+
+Here are the predictions for this case, which support all the expectations mentioned:
+
+```{r, echo = F}
+run_plot_model("pieCakeContextAdditivePreferences")
+```
+
+## Influence of biased prior beliefs
+
+If Quinn has no preferences but strong prior biases that either RP or LC is true (but not both), we expect the odds for the 'RP?' question against the general 'which' question to increase in comparison to a case with no prior biases.
+
+Here are the predictions for a no-preferences, no-biases case:
+
+```{r, echo = F}
+run_plot_model("pieCakeContextUnbiasedNoPref")
+```
+
+
+Compared to the case of strong prior beliefs that either RP or LC is true:
+
+```{r, echo = F}
+run_plot_model("pieCakeContextBiasedNoPref")
+```
+
+
