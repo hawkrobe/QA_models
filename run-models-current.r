@@ -6,7 +6,7 @@ library(aida) # remotes::install_github("michael-franke/aida-package")
 run_plot_model <- function (context_name = "pieCakeContext", questionerUtilFct = "KL") {
   webPPL_data = tibble('context' = context_name, 'questionerUtilFct' = questionerUtilFct)
   webppl(
-    program_file = "qa-models-sequential-decisions.webppl",
+    program_file = "qa-models-current.webppl",
     data = webPPL_data,
     data_var = "myDF"
   ) -> output
