@@ -2,6 +2,40 @@
 // | utilities |
 //  ----------
 
+// poor person's barplot emulation for terminal
+var terminalViz = function(dist, precisionLevel) {
+
+  var unfiltered_support = dist.support();
+  var unfiltered_probs   = map(function(x) {
+    return 1*dist.score(x).toPrecision(precisionLevel)}, dist.support())
+
+  var unsorted_probs   = filter(function(x) {return Math.exp(x) > 0},
+                                unfiltered_probs)
+  var unsorted_support = filter(function(x) {return Math.exp(dist.score(x)) > 0},
+                                unfiltered_support )
+
+  var sorted_probs     = sort(unsorted_probs);
+  var sortFunction = function(x) {
+    return -1*dist.score(x).toPrecision(precisionLevel)
+  }
+  var sorted_support   = sortOn(unsorted_support, sortFunction)
+  var max_length_element = _.max(map(function(e) {e.length}, sorted_support));
+  var scores = map(function(x) {
+    return 1*Math.exp(dist.score(x).toPrecision(precisionLevel)).toPrecision(precisionLevel)
+  }, sorted_support)
+  var maxScore =  _.max(map(function(e) {e}, scores));
+  map(
+    function(x) {
+      var score = 1*Math.exp(dist.score(x).toPrecision(precisionLevel)).toPrecision(precisionLevel)
+      console.log(" ",
+                  _.padEnd(x, max_length_element, " "),
+                  ": ",
+                  _.padEnd(_.repeat('*', score*20), 21),
+                  score
+                 )}
+    , sorted_support)
+  return "  ===viz==="
+}
 var butLast = function(xs){
   return xs.slice(0, xs.length-1);
 };
@@ -71,6 +105,25 @@ var replaceEmptyListWithStringNothing = function(set) {
 var setWithStringNothing = replaceEmptyListWithStringNothing(setWithEmptyListElement);
 var setsOfBakedGoods = setWithStringNothing;
 
+// build response set for pragmatic respondent (R1)
+var sampleR1PolarResponses = Infer(
+  {method: 'enumerate'},
+  function() {
+    var yesNoPart = uniformDraw(["yes", "no"]);
+    var itemPart = uniformDraw(_.concat(filter(
+      function(x) {
+        if (x != "") {
+          return x
+        }
+      },
+      setsOfBakedGoods
+    ), "---", "nothing"));
+    return [yesNoPart, itemPart].join(".")
+  }
+)
+var R1PolarResponses = sampleR1PolarResponses.support();
+var R1WHResponses = setsOfBakedGoods;
+
 // var pieCakeContextMinimal = {
 //   name : "minimal",
 //   // worlds include all possible sub-sets of 0 < k < N pies and cakes
@@ -121,7 +174,7 @@ var setsOfBakedGoods = setWithStringNothing;
 //     }
 //   },
 //   // R0 chooses among responses licensed by the question
-//   getLicensedResponses: function(question) {
+//   getLicensedResponsesR0: function(question) {
 //     if(question.type == 'polar-disjunct') {
 //       return ['yes', 'no'];
 //     } else if(question.type == 'wh') {
@@ -162,7 +215,7 @@ var setsOfBakedGoods = setWithStringNothing;
 //   }
 // )
 
-// console.log(setsOfBakedGoods);
+
 var pieCakeContext = {
   name : "pieCake-prefs",
   // worlds include all possible sub-sets of 0 < k < N pies and cakes
@@ -204,7 +257,7 @@ var pieCakeContext = {
   },
 
   // R0 chooses among responses licensed by the question
-  getLicensedResponses: function(question) {
+  getLicensedResponsesR0: function(question) {
     if(question.type == 'single-item') {
       // by definition polar questions require 'yes'/'no' answer
       return ['yes', 'no'];
@@ -223,6 +276,12 @@ var pieCakeContext = {
     } else {
       return console.error('question type not yet supported: ' + question.type);
     }
+  },
+
+  // R1 chooses among responses licensed by the question
+  getLicensedResponsesR1: function(question) {
+    return (question.type == 'wh' ?
+            R1WHResponses : R1PolarResponses)
   },
 
   meaning: function(world, question, response) {
@@ -373,9 +432,9 @@ var answerUtility = function(utterance, beliefs1, beliefs2, context) {
 };
 
 var R0 = cache(function(question, context) {
-  var getLicensedResponses = context.getLicensedResponses;
+  var getLicensedResponsesR0 = context.getLicensedResponsesR0;
   return Infer({method: 'enumerate'}, function(){
-    var response = uniformDraw(getLicensedResponses(question));
+    var response = uniformDraw(getLicensedResponsesR0(question));
 //     console.log(response);
     var ownBeliefs = context.respondantBeliefs;
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
@@ -422,8 +481,6 @@ var Q1 = cache(function(context) {
   });
 });
 
-
-print(_.concat(bakedGoods, "nothing"));
 // console.log(myDF);
 // var context =
 //     myDF[0].context == 'pieCakeContextMinimal' ? pieCakeContextMinimal :
@@ -435,29 +492,9 @@ print(_.concat(bakedGoods, "nothing"));
 //     false
 // Q1(context)
 
-var sampleAllPolarResponses = Infer(
-  {method: 'enumerate'},
-  function() {
-    var yesNoPart = uniformDraw(["yes", "no"]);
-    var itemPart = uniformDraw(_.concat(filter(
-      function(x) {
-        if (x != "") {
-          return x
-        }
-      },
-      setsOfBakedGoods
-    ), "---", "nothing"));
-    return [yesNoPart, itemPart].join(".")
-  }
-)
-
-var allPolarResponses = sampleAllPolarResponses.support();
-var allWHResponses = setsOfBakedGoods;
-console.log('R1 responses to polar question: ', allPolarResponses)
-console.log('R1 responses to WH question: ', allWHResponses)
-
-var R1Sampler = cache(function(question, trueState) {
-  var responses = question.type == "wh" ? allWHResponses : allPolarResponses;
+var R1Sampler = cache(function(context, question, trueState) {
+  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+  var responses = getLicensedResponsesR1(question);
   return Infer({method: 'enumerate'}, function(){
     var inferredPreferences = sample(Categorical({vs: ["prefs" , "no_prefs"]}));
 //     console.log(inferredPreferences);
@@ -480,7 +517,7 @@ var R1ContextPosterior = cache(function(question) {
     {method:'enumerate'},
     function() {
       var inferredPreferences = sample(Categorical({vs: ["prefs" , "no_prefs"]}));
-           console.log(inferredPreferences);
+           // console.log(inferredPreferences);
       var context = inferredPreferences == "prefs" ?
           pieCakeContextAdditivePreferences : pieCakeContextUnbiasedNoPref;
       var questioner = Q1(context);
@@ -490,8 +527,9 @@ var R1ContextPosterior = cache(function(question) {
   )
 })
 
-var R1Averager = cache(function(question, trueState) {
-  var responses = question.type == "wh" ? allWHResponses : allPolarResponses;
+var R1Averager = cache(function(context, question, trueState) {
+  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+  var responses = getLicensedResponsesR1(question);
   var ownBeliefs = Delta({v: trueState});
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
@@ -509,24 +547,53 @@ var R1Averager = cache(function(question, trueState) {
 });
 
 
-var context = pieCakeContextAdditivePreferences;
-// print(map(function(x) {x.queried}, context.questions));
+// var context = pieCakeContextAdditivePreferences;
+var context = pieCakeContextUnbiasedNoPref;
+console.log('context: \t', context.name);
+
 var question = context.questions[11];
-// print(setsOfBakedGoods)
+console.log('question: \t', question.text)
 
 var world = setsOfBakedGoods[13];
-console.log('world: ', world);
 var context_extended = extend(context, {respondantBeliefs: Delta({v: world})});
-console.log('question: ', question.text)
-var responses = context.getLicensedResponses
-console.log('R0 available responses: ', responses(question))
-var response = responses(question)[3]
-console.log('response: ', response)
+console.log('world: \t\t', world);
+
+var responsesR0 = context.getLicensedResponsesR0
+console.log('R0 resp. set: \t', responsesR0(question))
+
+var responseR0 = responsesR0(question)[3]
+console.log('response R0: \t', responseR0)
+
 var meaning = context.meaning
-console.log('truth value: ', meaning(world,question,response));
+console.log('truth R0 r.: \t', meaning(world,question,responseR0));
+
+var responsesR1 = context.getLicensedResponsesR1
+console.log('R1 resp. set \t: ', responsesR1(question))
+
+var responseR1 = responsesR1(question)[12]
+console.log('response R1: \t', responseR1)
+
+var meaning = context.meaning
+console.log('truth R1 r.: \t', meaning(world,question,responseR1));
+
+
+var R0 = R0(question, context_extended)
+
+var R1Sampler  = marginalize(R1Sampler(context, question, "raspPie+lemonCake"), 'response')
+var R1Averager = R1Averager(context, question, "raspPie+lemonCake")
+
+console.log("R0:")
+terminalViz(R0, 4)
+
+console.log("R1-Sampler:")
+terminalViz(R1Sampler,4)
+
+console.log("R1-Averager:")
+terminalViz(R1Averager,4)
+
 
 // viz(R0(question, context_extended));
 // viz(Q1(context));
 
-viz(R1Sampler(question, "raspPie+lemonCake"));
-viz(R1Averager(question, "raspPie+lemonCake"));
+// viz(R1Sampler(context, question, "raspPie+lemonCake"));
+// viz(R1Averager(context, question, "raspPie+lemonCake"));
