@@ -79,8 +79,9 @@ var params = {
   R0Alpha : 0.0001,
   questionerAlpha : 3,
   R1Alpha : 5,
-  relevanceBeta: 0.75, // beta=1 for only action-utility
-  costWeight: 0.5
+  relevanceBetaR0: 0,     // beta=1 for only action-utility
+  relevanceBetaR1: 0.8,   //
+  costWeight: 0.15
 };
 
 var bakedGoods = ['raspPie', 'raspCake', 'lemonPie', 'lemonCake'];
@@ -121,7 +122,12 @@ var sampleR1PolarResponses = Infer(
     return [yesNoPart, itemPart].join(".")
   }
 )
-var R1PolarResponses = sampleR1PolarResponses.support();
+var R1PolarResponses = filter(
+  function(r) {
+    // some responses can never be true
+    r != "yes.nothing" && r != "no.raspPie+raspCake+lemonPie+lemonCake"
+  },
+  sampleR1PolarResponses.support());
 var R1WHResponses = setsOfBakedGoods;
 
 // var pieCakeContextMinimal = {
@@ -283,49 +289,73 @@ var pieCakeContext = {
     return (question.type == 'wh' ?
             R1WHResponses : R1PolarResponses)
   },
-
+  // semantic meaning function
   meaning: function(world, question, response) {
-    if(response == '') {
-      // assume silence has null meaning
-      return true;
-    }
-    if(response == "nothing") {
-      if(world == "nothing") {
+
+    // meaning of literals / atoms
+    var meaning_atomic = function(world, question, response) {
+      // console.log(" *** now evaluating response: part ", response)
+      if(response == '' || response == "---") {
+        // assume silence has null meaning
         return true;
-      } else
-      if(world != "nothing") {
-        return _.intersection(world.split('+'), question.queried).length == 0;
       }
+      if(response == "nothing") {
+        if(world == "nothing") {
+          return true;
+        }
+      }
+      if(world == "nothing" && question.type == 'wh') {
+        return response == "nothing";
+      }
+      if(question.type == 'single-item') {
+        return (
+          response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+            response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+            all(function(item) {
+              return _.includes(world.split('+'), item);
+            }, response.split('+')));
+        // return (
+        //   response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+        //     response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+        //     console.error('Not a valid response to question:', question, response));
+      } else
+        if(question.type == 'polar-disjunct') {
+          return (
+            response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+              response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+              all(function(item) {
+                return _.includes(world.split('+'), item);
+              }, response.split('+')));
+        } else if(question.type == 'wh') {
+          // assume response is true when the shop contains every mentioned item
+          return all(function(item) {
+            return _.includes(world.split('+'), item);
+          }, response.split('+'));
+        } else {
+          return console.error('question type not yet supported: ' + question.type);
+        }
     }
-    if(world == "nothing") {
-      return response == "nothing";
-    }
-    if(question.type == 'single-item') {
-      // assume simplest meaning: 'yes' is true if any item in
-      // question is available o.w. 'no' is true
-      return (
-        response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
-        response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
-        console.error('Not a valid response to question:', question, response));
-    } else
-    if(question.type == 'polar-disjunct') {
-      // assume simplest meaning: 'yes' is true if any item in
-      // question is available o.w. 'no' is true
-      return (
-        response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
-        response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
-        all(function(item) {
-          return _.includes(world.split('+'), item);
-        }, response.split('+')));
-    } else if(question.type == 'wh') {
-      // assume response is true when the shop contains every mentioned item
-      return all(function(item) {
-        return _.includes(world.split('+'), item);
-      }, response.split('+'));
-    } else {
-      return console.error('question type not yet supported: ' + question.type);
-    }
-  }
+
+    // meaning of conjunctions
+
+    // console.log("full response: ", _.split(response, '.'))
+    // var TVs = map(
+    //   function (r) {
+    //     meaning_atomic(world, question, r)
+    //   },
+    //   _.split(response, '.')
+    // )
+    // console.log('truth values of conjuncts: ', TVs)
+
+    return all(
+      function (r) {
+        meaning_atomic(world, question, r)
+      },
+      _.split(response, '.')
+    )
+
+  },
+
 };
 
 // amended context with feature-based (additive) preferences
@@ -381,7 +411,7 @@ var pieCakeContextBiasedNoPref = extend(
 
 // response cost is proportional to length in words
 var cost = function(response) {
-  return params.costWeight * (response.split('+').length - 1);
+  return _.includes(response, "---") ? 0 : params.costWeight * (response.split('+').length);
 };
 
 // weight possible actions proportional
@@ -396,6 +426,22 @@ var relevanceProjection = function(beliefs, context) {
     return action;
   });
 };
+
+// returns TRUE if a response is contradictory in the light of the question
+// example: "Do you have any pie?" "No, we have lemon pie."
+var isContradiction = function(context, question, response) {
+  var meaning = context.meaning;
+  var isContra = all(
+    function(world) {
+      !meaning(world,question,response)
+    },
+    context.worlds
+  )
+  // if (isContra) {
+  //   console.log("Contradiction hit: ", question.text, response)
+  // }
+  return isContra
+}
 
 // gives updated beliefs about world state after hearing response to question
 // based on a literal interpretation of the response
@@ -421,13 +467,13 @@ var questionUtility = function(utterance, beliefs, context) {
   return actionUtility - cost(utterance);
 };
 
-var answerUtility = function(utterance, beliefs1, beliefs2, context) {
+var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta) {
   // respondant wants to *minimize* KL b/w beliefs (bringing closer to own belief)
   var epistemicUtility = -KL(beliefs1, beliefs2);
   var actionUtility = -KL(relevanceProjection(beliefs1, context),
                           relevanceProjection(beliefs2, context));
-  return ((1 - params.relevanceBeta) * epistemicUtility
-          + params.relevanceBeta * actionUtility
+  return ((1 - relevanceBeta) * epistemicUtility
+          + relevanceBeta * actionUtility
           - cost(utterance));
 };
 
@@ -439,7 +485,7 @@ var R0 = cache(function(question, context) {
     var ownBeliefs = context.respondantBeliefs;
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
 //     console.log('updated beliefs', otherBeliefs);
-    factor(params.R0Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context));
+    factor(params.R0Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR0));
     return response;
   });
 });
@@ -494,20 +540,18 @@ var Q1 = cache(function(context) {
 
 var R1Sampler = cache(function(context, question, trueState) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
-  var responses = getLicensedResponsesR1(question);
+  var responses = filter(function(r) {!isContradiction(context, question, r)},
+                         getLicensedResponsesR1(question));
   return Infer({method: 'enumerate'}, function(){
     var inferredPreferences = sample(Categorical({vs: ["prefs" , "no_prefs"]}));
-//     console.log(inferredPreferences);
     var context  = inferredPreferences == "prefs" ?
         pieCakeContextAdditivePreferences : pieCakeContextUnbiasedNoPref;
     var questioner = Q1(context);
     factor(questioner.score(question.text));
     var response = uniformDraw(responses);
-//     console.log(response);
     var ownBeliefs = Delta({v: trueState});
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-//     console.log('updated beliefs', otherBeliefs);
-    factor(params.R1Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context));
+    factor(params.R1Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR1));
     return {inferredPreferences, response};
   });
 });
@@ -519,7 +563,8 @@ var R1ContextPosterior = cache(function(question) {
       var inferredPreferences = sample(Categorical({vs: ["prefs" , "no_prefs"]}));
            // console.log(inferredPreferences);
       var context = inferredPreferences == "prefs" ?
-          pieCakeContextAdditivePreferences : pieCakeContextUnbiasedNoPref;
+          pieCakeContextAdditivePreferences : pieCakeContextAdditivePreferences ;
+          // pieCakeContextAdditivePreferences : pieCakeContextUnbiasedNoPref;
       var questioner = Q1(context);
       factor(questioner.score(question.text));
       return context
@@ -529,16 +574,17 @@ var R1ContextPosterior = cache(function(question) {
 
 var R1Averager = cache(function(context, question, trueState) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
-  var responses = getLicensedResponsesR1(question);
+  var responses = filter(function(r) {!isContradiction(context, question, r)},
+                         getLicensedResponsesR1(question));
   var ownBeliefs = Delta({v: trueState});
+  var contextPosterior = R1ContextPosterior(question);
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
-    var contextPosterior = R1ContextPosterior(question);
     var expectedUtility = expectation(
       contextPosterior,
       function(context) {
         var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-        return answerUtility(response, ownBeliefs, otherBeliefs, context)
+        return answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR1)
       }
     )
     factor(params.R1Alpha * expectedUtility);
@@ -547,53 +593,67 @@ var R1Averager = cache(function(context, question, trueState) {
 });
 
 
-// var context = pieCakeContextAdditivePreferences;
-var context = pieCakeContextUnbiasedNoPref;
+var context = pieCakeContextAdditivePreferences;
+// var context = pieCakeContextUnbiasedNoPref;
 console.log('context: \t', context.name);
 
-var question = context.questions[11];
+var question = context.questions[2];
 console.log('question: \t', question.text)
 
-var world = setsOfBakedGoods[13];
+var world = setsOfBakedGoods[10];
+// console.log(setsOfBakedGoods);
 var context_extended = extend(context, {respondantBeliefs: Delta({v: world})});
 console.log('world: \t\t', world);
 
-var responsesR0 = context.getLicensedResponsesR0
-console.log('R0 resp. set: \t', responsesR0(question))
+// var responsesR0 = context.getLicensedResponsesR0
+// // console.log('R0 resp. set: \t', responsesR0(question))
 
-var responseR0 = responsesR0(question)[3]
-console.log('response R0: \t', responseR0)
+// var responseR0 = responsesR0(question)[0]
+// console.log('response R0: \t', responseR0)
 
-var meaning = context.meaning
-console.log('truth R0 r.: \t', meaning(world,question,responseR0));
+// var meaning = context.meaning
+// console.log('truth R0 r.: \t', meaning(world,question,responseR0));
 
-var responsesR1 = context.getLicensedResponsesR1
-console.log('R1 resp. set \t: ', responsesR1(question))
+// var responsesR1 = context.getLicensedResponsesR1
+// console.log('R1 resp. set \t: ', responsesR1(question))
 
-var responseR1 = responsesR1(question)[12]
-console.log('response R1: \t', responseR1)
+// map(
+//   function(world) {
+//     console.log("In world ('"+ world +"') the following of R1's responses are true: \n",
+//                 filter(function (r) {
+//                   meaning(world,question,r)
+//                 },
+//                        responsesR1(question))
+//                )
+//   },
+//   setsOfBakedGoods
+// )
 
-var meaning = context.meaning
-console.log('truth R1 r.: \t', meaning(world,question,responseR1));
+// var responseR1 = responsesR1(question)[0]
+// console.log('response R1: \t', responseR1)
 
+// var meaning = context.meaning
+// console.log('truth R1 r.: \t', meaning(world,question,responseR1));
 
 var R0 = R0(question, context_extended)
-
-var R1Sampler  = marginalize(R1Sampler(context, question, "raspPie+lemonCake"), 'response')
-var R1Averager = R1Averager(context, question, "raspPie+lemonCake")
 
 console.log("R0:")
 terminalViz(R0, 4)
 
+var R1Sampler  = marginalize(R1Sampler(context, question, world), 'response')
 console.log("R1-Sampler:")
 terminalViz(R1Sampler,4)
 
+var R1Averager = R1Averager(context, question, world)
 console.log("R1-Averager:")
 terminalViz(R1Averager,4)
 
 
+//////////////////////////////////////////////////
+// vizualization the browswer
 // viz(R0(question, context_extended));
 // viz(Q1(context));
+//////////////////////////////////////////////////
 
 // viz(R1Sampler(context, question, "raspPie+lemonCake"));
 // viz(R1Averager(context, question, "raspPie+lemonCake"));
