@@ -158,7 +158,7 @@ var R1WHResponses = setsOfBakedGoods;
 
 //   // assume questioner is uncertain but answerer has Delta on true world (e.g. shopkeep)
 //   questionerBeliefs: Categorical({vs: bakedGoodsMinimal}),
-//   respondantBeliefs: Delta({v: 'RP'}),
+//   R0PriorOverWorlds: Delta({v: 'RP'}),
 
 //   // raspberry pie is #1 preference (U=5), lemon cake is #2 preference (U=4).
 //   // otherwise U=1 if whatever you order is in stock and 0 if it's not in stock
@@ -197,7 +197,7 @@ var R1WHResponses = setsOfBakedGoods;
 //   {
 //     name : "minimal-with-preferences",
 //     // respondant knows true answer
-//     respondantBeliefs: Delta({v: 'lemonCake'}),
+//     R0PriorOverWorlds: Delta({v: 'lemonCake'}),
 //     // no preferences over baked goods
 //     questions: [
 //       // single item polar questions
@@ -251,7 +251,8 @@ var pieCakeContext = {
 
   // assume questioner is uncertain but answerer has Delta on true world (e.g. shopkeep)
   questionerBeliefs: Categorical({vs: setsOfBakedGoods}),
-  respondantBeliefs: Delta({v: 'lemonCake'}),
+  R0PriorOverWorlds: Delta({v: 'lemonCake'}),
+  R1PriorOverWorlds: Delta({v: 'lemonCake'}),
 
   // raspberry pie is #1 preference (U=5), lemon cake is #2 preference (U=4).
   // otherwise U=1 if whatever you order is in stock and 0 if it's not in stock
@@ -338,15 +339,6 @@ var pieCakeContext = {
 
     // meaning of conjunctions
 
-    // console.log("full response: ", _.split(response, '.'))
-    // var TVs = map(
-    //   function (r) {
-    //     meaning_atomic(world, question, r)
-    //   },
-    //   _.split(response, '.')
-    // )
-    // console.log('truth values of conjuncts: ', TVs)
-
     return all(
       function (r) {
         meaning_atomic(world, question, r)
@@ -354,8 +346,7 @@ var pieCakeContext = {
       _.split(response, '.')
     )
 
-  },
-
+  }
 };
 
 // amended context with feature-based (additive) preferences
@@ -363,26 +354,43 @@ var pieCakeContextAdditivePreferences = extend(
   pieCakeContext,
   {
     name : "pieCake-prefs-additive",
-    // feature-additive preferences: pie = 3, cake = 2, rasp = 6, lemon = 4;
+    // feature-additive preferences: pie = 2, cake = 1, rasp = 6, lemon = 4;
     decisionProblem: function(w, a) {
-      return _.includes(w, a) ? (a == 'raspPie' ? 9 :
-                                 a == 'raspCake' ? 8 :
-                                 a == 'lemonPie' ? 7 :
-                                 a == 'lemonCake' ? 6 :
-                                 a == 'nothing' ? 1 :
+      return _.includes(w, a) ? (a == 'raspPie'   ? 8/2 :
+                                 a == 'raspCake'  ? 7/2 :
+                                 a == 'lemonPie'  ? 6/2 :
+                                 a == 'lemonCake' ? 5/2 :
+                                 a == 'nothing'   ? 1/2 :
                                  console.error('unknown action')
                                 ) : 0.0000001;
     }
   }
 )
 
+// amended context with feature-based (additive) preferences (reversed)
+var pieCakeContextAdditivePreferencesReversed = extend(
+  pieCakeContext,
+  {
+    name : "pieCake-prefs-additive-reversed",
+    // feature-additive preferences: pie = 4, cake = 6, rasp = 1, lemon = 2;
+    decisionProblem: function(w, a) {
+      return _.includes(w, a) ? (a == 'raspPie'   ? 5/2 :
+                                 a == 'raspCake'  ? 7/2 :
+                                 a == 'lemonPie'  ? 6/2 :
+                                 a == 'lemonCake' ? 8/2 :
+                                 a == 'nothing'   ? 1/2 :
+                                 console.error('unknown action')
+                                ) : 0.0000001;
+    }
+  }
+)
 // amended context with unbiased questioner beliefs and no preferences over any baked good
 var pieCakeContextUnbiasedNoPref = extend(
   pieCakeContext,
   {
     name : "pieCake-no-prefs",
     // respondant knows true answer
-    respondantBeliefs: Delta({v: 'lemonCake'}),
+    R0PriorOverWorlds: Delta({v: 'lemonCake'}),
     // no preferences over baked goods
     decisionProblem: function(w, a) {
       return _.includes(w, a) ? 1 : 0.0000001;
@@ -394,7 +402,7 @@ var pieCakeContextUnbiasedNoPref = extend(
 var pieCakeContextBiasedNoPref = extend(
   pieCakeContextUnbiasedNoPref,
   {
-    name : "pieCake-no-prefs-biased",
+    name : "pieCake-no-prefs-over-confident",
     // assume questioner is virtually certain that they have either raspberry pie
     // or lemon cake (but not both)
     questionerBeliefs: Categorical({
@@ -402,6 +410,29 @@ var pieCakeContextBiasedNoPref = extend(
       ps: map(
         function (x) {
           return x == 'raspPie' ? 1000 : x == 'lemonCake' ? 1000 : 1
+        },
+        setsOfBakedGoods
+      )
+    })
+  }
+)
+
+// amended context with biased, heavily pessimistic beliefs & no preferences
+var pieCakeContextBiasedPessimist = extend(
+  pieCakeContextUnbiasedNoPref,
+  {
+    name : "pieCake-no-prefs-pessimist",
+    // questioner believes that the shop has likely no or very few items
+    questionerBeliefs: Categorical({
+      vs: setsOfBakedGoods,
+      ps: map(
+        function (x) {
+          return (x == 'nothing' ? 100 :
+                  x.split('+').length == '1' ? 10 :
+                  x.split('+').length == '2' ? 1 :
+                  x.split('+').length == '3' ? 0.1 :
+                  x.split('+').length == '4' ? 0.01 :
+                  0.000000001)
         },
         setsOfBakedGoods
       )
@@ -482,7 +513,7 @@ var R0 = cache(function(question, context) {
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(getLicensedResponsesR0(question));
 //     console.log(response);
-    var ownBeliefs = context.respondantBeliefs;
+    var ownBeliefs = context.R0PriorOverWorlds;
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
 //     console.log('updated beliefs', otherBeliefs);
     factor(params.R0Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR0));
@@ -497,7 +528,7 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context) {
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
     var pragmaticResponse = R0(question, extend(context, {
-      respondantBeliefs: Delta({v: world})
+      R0PriorOverWorlds: Delta({v: world})
     }));
     observe(pragmaticResponse,response)
     return world;
@@ -511,7 +542,7 @@ var Q1 = cache(function(context) {
     var expectedUtility = expectation(context.questionerBeliefs, function(trueWorld) {
 //       console.log('in possible world', trueWorld);
       var possibleResponses = R0(question, extend(context, {
-        respondantBeliefs: Delta({v: trueWorld})
+        R0PriorOverWorlds: Delta({v: trueWorld})
       }));
 //       console.log('respondent: ', possibleResponses)
       return expectation(possibleResponses, function(response) {
@@ -538,45 +569,74 @@ var Q1 = cache(function(context) {
 //     false
 // Q1(context)
 
-var R1Sampler = cache(function(context, question, trueState) {
-  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
-  var responses = filter(function(r) {!isContradiction(context, question, r)},
-                         getLicensedResponsesR1(question));
-  return Infer({method: 'enumerate'}, function(){
-    var inferredPreferences = sample(Categorical({vs: ["prefs" , "no_prefs"]}));
-    var context  = inferredPreferences == "prefs" ?
-        pieCakeContextAdditivePreferences : pieCakeContextUnbiasedNoPref;
-    var questioner = Q1(context);
-    factor(questioner.score(question.text));
-    var response = uniformDraw(responses);
-    var ownBeliefs = Delta({v: trueState});
-    var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-    factor(params.R1Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR1));
-    return {inferredPreferences, response};
-  });
-});
+//////////////////////////////////////////////////
+// R1 : pragmatic respondent
+// ---
+// R1's prior beliefs are a distribution over
+// different context which differ only wrt
+// the questioner's beliefs and/or preferences.
+// There are two kinds of R1: a sampler and an
+// averager. The former is computationally faster,
+// the latter is "normatively correct".
+//////////////////////////////////////////////////
 
-var R1ContextPosterior = cache(function(question) {
+// defining different priors of R1 over various contexts
+
+var R1PriorContext_beliefsQ1 = {
+  confident: pieCakeContextBiasedNoPref,
+  unbiased:  pieCakeContextUnbiasedNoPref,
+  pessimist: pieCakeContextBiasedPessimist,
+  distribution: Categorical({vs: ["confident" , "unbiased",  "pessimist"]})
+}
+
+var R1PriorContext_PreferenceQ1 = {
+  raspCake:  pieCakeContextAdditivePreferences,
+  PieLemon:  pieCakeContextAdditivePreferencesReversed,
+  distribution: Categorical({vs: ["raspCake" , "PieLemon"]})
+}
+
+var R1ContextPosterior = cache(function(context, question, R1PriorContext) {
   Infer(
     {method:'enumerate'},
     function() {
-      var inferredPreferences = sample(Categorical({vs: ["prefs" , "no_prefs"]}));
-           // console.log(inferredPreferences);
-      var context = inferredPreferences == "prefs" ?
-          pieCakeContextAdditivePreferences : pieCakeContextAdditivePreferences ;
-          // pieCakeContextAdditivePreferences : pieCakeContextUnbiasedNoPref;
-      var questioner = Q1(context);
+      var context_label  = sample(R1PriorContext.distribution);
+      var context_sample = extend(
+        R1PriorContext[context_label],
+        {R1PriorOverWorlds: context.R1PriorOverWorlds});
+      var questioner = Q1(context_sample);
+      // console.log("considering context: ", context_label);
+      // console.log("prob of question ", question.text, ": ", questioner.score(question.text));
       factor(questioner.score(question.text));
-      return context
+      return {label: context_label, sample: context_sample, name: context_sample.name}
     }
   )
 })
 
-var R1Averager = cache(function(context, question, trueState) {
+var R1Sampler = cache(function(context, R1PriorContext, question) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
-  var ownBeliefs = Delta({v: trueState});
+  return Infer({method: 'enumerate'}, function(){
+    var context_label  = sample(R1PriorContext.distribution);
+    var context_sample = extend(
+      R1PriorContext[context_label],
+      {R1PriorOverWorlds: context.R1PriorOverWorlds});
+    var questioner = Q1(context_sample);
+    factor(questioner.score(question.text));
+    var response = uniformDraw(responses);
+    var ownBeliefs = context.R1PriorOverWorlds;
+    var otherBeliefs = updateBeliefs(context_sample.questionerBeliefs, question, response, context_sample);
+    var utility = answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1);
+    factor(params.R1Alpha * utility);
+    return {context_label, response};
+  });
+});
+
+var R1Averager = cache(function(context, question) {
+  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+  var responses = filter(function(r) {!isContradiction(context, question, r)},
+                         getLicensedResponsesR1(question));
+  var ownBeliefs = context.R1PriorOverWorlds;
   var contextPosterior = R1ContextPosterior(question);
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
@@ -602,7 +662,10 @@ console.log('question: \t', question.text)
 
 var world = setsOfBakedGoods[10];
 // console.log(setsOfBakedGoods);
-var context_extended = extend(context, {respondantBeliefs: Delta({v: world})});
+var context_extended = extend(context, {
+  R0PriorOverWorlds: Delta({v: world}),
+  R1PriorOverWorlds: Delta({v: world}),
+});
 console.log('world: \t\t', world);
 
 // var responsesR0 = context.getLicensedResponsesR0
@@ -635,25 +698,32 @@ console.log('world: \t\t', world);
 // var meaning = context.meaning
 // console.log('truth R1 r.: \t', meaning(world,question,responseR1));
 
-var R0 = R0(question, context_extended)
+// var R0 = R0(question, context_extended)
 
-console.log("R0:")
-terminalViz(R0, 4)
+// console.log("R0:")
+// terminalViz(R0, 4)
 
-var R1Sampler  = marginalize(R1Sampler(context, question, world), 'response')
-console.log("R1-Sampler:")
-terminalViz(R1Sampler,4)
+// var R1Sampler  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question), 'response')
+// console.log("R1-Sampler:")
+// terminalViz(R1Sampler,4)
 
-var R1Averager = R1Averager(context, question, world)
-console.log("R1-Averager:")
-terminalViz(R1Averager,4)
+// var R1Averager = R1Averager(context_extended, question)
+// console.log("R1-Averager:")
+// terminalViz(R1Averager,4)
 
+// belief inference
+var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1);
+terminalViz(marginalize(R1posteriorContextBeliefs, 'label'),4)
+
+// preference inference
+var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1);
+terminalViz(marginalize(R1posteriorContextPreference, 'label'),4)
 
 //////////////////////////////////////////////////
-// vizualization the browswer
+// visualization in the browser
 // viz(R0(question, context_extended));
 // viz(Q1(context));
 //////////////////////////////////////////////////
 
-// viz(R1Sampler(context, question, "raspPie+lemonCake"));
-// viz(R1Averager(context, question, "raspPie+lemonCake"));
+// viz(R1Sampler);
+// viz(R1Averager);
