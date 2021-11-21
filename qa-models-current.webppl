@@ -395,6 +395,41 @@ var pieCakeContextAdditivePreferencesReversed = extend(
   }
 )
 
+// amended context with topic preference (dough is irrelevant)
+//   agent prefers raspberry over lemon and rather has nothing than lemon
+var pieCakeContext_raspberry = extend(
+  pieCakeContext,
+  {
+    name : "raspberry-pref",
+    decisionProblem: function(w, a) {
+      return _.includes(w, a) ? (a == 'raspPie'   ? 7/2 :
+                                 a == 'raspCake'  ? 7/2 :
+                                 a == 'lemonPie'  ? 1/2 :
+                                 a == 'lemonCake' ? 1/2 :
+                                 a == 'nothing'   ? 2/2 :
+                                 console.error('unknown action')
+                                ) : 0.0000001;
+    }
+  }
+)
+//   like the previous but reversed (lemon > nothing > raspberry)
+var pieCakeContext_lemon = extend(
+  pieCakeContext,
+  {
+    name : "lemon-pref",
+    decisionProblem: function(w, a) {
+      return _.includes(w, a) ? (a == 'raspPie'   ? 1/2 :
+                                 a == 'raspCake'  ? 1/2 :
+                                 a == 'lemonPie'  ? 7/2 :
+                                 a == 'lemonCake' ? 7/2 :
+                                 a == 'nothing'   ? 2/2 :
+                                 console.error('unknown action')
+                                ) : 0.0000001;
+    }
+  }
+)
+
+
 // amended context with unbiased questioner beliefs and no preferences over any baked good
 var pieCakeContextUnbiasedNoPref = extend(
   pieCakeContext,
@@ -543,6 +578,23 @@ var R0 = cache(function(question, context) {
   });
 });
 
+// dummy R0 with response set of R1
+var R0_extended = cache(function(question, context) {
+  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+  var responses = filter(function(r) {!isContradiction(context, question, r)},
+                         getLicensedResponsesR1(question));
+  return Infer({method: 'enumerate'}, function(){
+    var response = uniformDraw(responses);
+    // console.log(response);
+    var ownBeliefs = context.R0PriorOverWorlds;
+    var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
+    // console.log('updated beliefs: ');
+    // terminalViz(otherBeliefs, 4);
+    factor(10 * (-KL(ownBeliefs, otherBeliefs) - cost(response)));
+    return response;
+  });
+});
+
 // gives updated beliefs about world state after hearing response to question
 // based on a pragmatic interpretation of the response (as emitted by R0)
 var updateBeliefsPragmatic = function(beliefs, question, response, context) {
@@ -550,6 +602,20 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context) {
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
     var pragmaticResponse = R0(question, extend(context, {
+      R0PriorOverWorlds: Delta({v: world})
+    }));
+    observe(pragmaticResponse,response)
+    return world;
+  });
+};
+
+// gives updated beliefs about world state after hearing response to question
+// based on a pragmatic interpretation (as emitted by R0 w/ full answer set of R1)
+var updateBeliefsPragmaticR1 = function(beliefs, question, response, context) {
+  var meaning = context.meaning;
+  return Infer({method: 'enumerate'}, function() {
+    var world = sample(beliefs);
+    var pragmaticResponse = R0_extended(question, extend(context, {
       R0PriorOverWorlds: Delta({v: world})
     }));
     observe(pragmaticResponse,response)
@@ -621,6 +687,13 @@ var R1PriorContext_PreferenceQ1 = {
   distribution: Categorical({vs: ["raspCake" , "PieLemon"]})
 }
 
+// R1 does not know the preferences of the questoiner
+var R1PriorContext_BinaryPrefs = {
+  raspberry: pieCakeContext_raspberry,
+  lemon    : pieCakeContext_lemon,
+  distribution: Categorical({vs: ["raspberry" , "lemon"]})
+}
+
 var R1ContextPosterior = cache(function(context, question, R1PriorContext) {
   Infer(
     {method:'enumerate'},
@@ -666,10 +739,13 @@ var R1Averager = cache(function(context, R1PriorContext, question) {
   var contextPosterior = marginalize(R1ContextPosterior(context, question, R1PriorContext), 'sample');
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
+    // console.log("considering response: ", response)
     var expectedUtility = expectation(
       contextPosterior,
       function(context_sample) {
-        var otherBeliefs = updateBeliefs(context_sample.questionerBeliefs, question, response, context_sample);
+        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs, question, response, context_sample);
+        // console.log("updated beliefs after response: ", response)
+        // terminalViz(otherBeliefs, 4)
         return answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1)
       }
     )
@@ -701,10 +777,10 @@ var responsesR0 = context.getLicensedResponsesR0
 // console.log('R0 resp. set: \t', responsesR0(question))
 
 var responseR0 = responsesR0(question)[0]
-console.log('response R0: \t', responseR0)
+// console.log('response R0: \t', responseR0)
 
 var meaning = context.meaning
-console.log('truth R0 r.: \t', meaning(world,question,responseR0));
+// console.log('truth R0 r.: \t', meaning(world,question,responseR0));
 
 var responsesR1 = context.getLicensedResponsesR1
 // console.log('R1 resp. set \t: ', responsesR1(question))
@@ -722,46 +798,69 @@ var responsesR1 = context.getLicensedResponsesR1
 // )
 
 var responseR1 = responsesR1(question)[0]
-console.log('response R1: \t', responseR1)
+// console.log('response R1: \t', responseR1)
 
 var meaning = context.meaning
-console.log('truth R1 r.: \t', meaning(world,question,responseR1));
+// console.log('truth R1 r.: \t', meaning(world,question,responseR1));
 
-var R0 = R0(question, context_extended)
+var R0_test = R0(question, context_extended)
 
 console.log("R0:")
-terminalViz(R0, 4)
+terminalViz(R0_test, 4)
+
+var R0Ext_test = R0_extended(question, context_extended)
+
+console.log("R0 (extended):")
+terminalViz(R0Ext_test, 4)
+
+
 
 //  -------------------------------------
 //  testing belief & preference inference
 //  -------------------------------------
 
-
 // belief inference
-var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1);
-console.log("Posterior inference (uncertainty about beliefs)")
-terminalViz(marginalize(R1posteriorContextBeliefs, 'label'),4)
+// var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1);
+// console.log("Posterior inference (uncertainty about beliefs)")
+// terminalViz(marginalize(R1posteriorContextBeliefs, 'label'),4)
 
-var R1SamplerBeliefInference  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question), 'response')
-console.log("R1-Sampler (uncertainty about beliefs):")
-terminalViz(R1SamplerBeliefInference,4)
+// var R1SamplerBeliefInference  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question), 'response')
+// console.log("R1-Sampler (uncertainty about beliefs):")
+// terminalViz(R1SamplerBeliefInference,4)
 
-var R1AveragerBeliefInference = R1Averager(context_extended, R1PriorContext_beliefsQ1, question)
-console.log("R1-Averager (uncertainty about beliefs):")
-terminalViz(R1AveragerBeliefInference,4)
+// var R1AveragerBeliefInference = R1Averager(context_extended, R1PriorContext_beliefsQ1, question)
+// console.log("R1-Averager (uncertainty about beliefs):")
+// terminalViz(R1AveragerBeliefInference,4)
 
-// preference inference
-var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1);
-console.log("Posterior inference (uncertainty about preferences)")
-terminalViz(marginalize(R1posteriorContextPreference, 'label'),4)
+// // preference inference
+// var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1);
+// console.log("Posterior inference (uncertainty about preferences)")
+// terminalViz(marginalize(R1posteriorContextPreference, 'label'),4)
 
-var R1SamplerPreferenceInference  = marginalize(R1Sampler(context_extended, R1PriorContext_PreferenceQ1, question), 'response')
-console.log("R1-Sampler (uncertainty about preferences):")
-terminalViz(R1SamplerPreferenceInference,4)
+// var R1SamplerPreferenceInference  = marginalize(R1Sampler(context_extended, R1PriorContext_PreferenceQ1, question), 'response')
+// console.log("R1-Sampler (uncertainty about preferences):")
+// terminalViz(R1SamplerPreferenceInference,4)
 
-var R1AveragerPreferenceInference = R1Averager(context_extended, R1PriorContext_PreferenceQ1, question)
-console.log("R1-Averager (uncertainty about preferences):")
-terminalViz(R1AveragerPreferenceInference,4)
+// var R1AveragerPreferenceInference = R1Averager(context_extended, R1PriorContext_PreferenceQ1, question)
+// console.log("R1-Averager (uncertainty about preferences):")
+// terminalViz(R1AveragerPreferenceInference,4)
+
+// binary preference inference
+
+var R1posteriorContextPreferenceBinaryQRP = R1ContextPosterior(
+  pieCakeContextUnbiasedNoPref,
+  context.questions[2],
+  R1PriorContext_BinaryPrefs);
+console.log("Posterior inference (after RP?)")
+terminalViz(marginalize(R1posteriorContextPreferenceBinaryQRP, 'label'),4)
+
+var R1AveragerPreferenceInferenceBinaryQRP = R1Averager(
+  context_extended,
+  R1PriorContext_BinaryPrefs,
+  context.questions[2])
+console.log("R1-Averager ('RP?'):")
+terminalViz(R1AveragerPreferenceInferenceBinaryQRP,4)
+
 
 //////////////////////////////////////////////////
 // visualization in the browser
