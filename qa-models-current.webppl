@@ -86,7 +86,7 @@ var params = {
   R1Alpha : 5,
   relevanceBetaR0: 0,     // beta=1 for only action-utility
   relevanceBetaR1: 0.8,   //
-  costWeight: 0.15
+  costWeight: 0.5
 };
 
 //  --------------------------
@@ -579,7 +579,7 @@ var R0 = cache(function(question, context) {
 });
 
 // dummy R0 with response set of R1
-var R0_extended = cache(function(question, context) {
+var R1ContextFree = cache(function(question, context) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
@@ -615,7 +615,7 @@ var updateBeliefsPragmaticR1 = function(beliefs, question, response, context) {
   var meaning = context.meaning;
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
-    var pragmaticResponse = R0_extended(question, extend(context, {
+    var pragmaticResponse = R1ContextFree(question, extend(context, {
       R0PriorOverWorlds: Delta({v: world})
     }));
     observe(pragmaticResponse,response)
@@ -746,7 +746,19 @@ var R1Averager = cache(function(context, R1PriorContext, question) {
         var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs, question, response, context_sample);
         // console.log("updated beliefs after response: ", response)
         // terminalViz(otherBeliefs, 4)
-        return answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1)
+        var decisionProblem = context_sample.decisionProblem;
+        var actionPolicy = relevanceProjection(otherBeliefs, context);
+        var actionUtility = expectation(actionPolicy, function(action) {
+          // weight possible actions proportional to reward
+          return expectation(otherBeliefs, function(world) {
+            return decisionProblem(world, action);
+          });
+        });
+        var EU = ((1-params.relevanceBetaR1) * -KL(ownBeliefs, otherBeliefs) +
+            params.relevanceBetaR1 * actionUtility -
+        cost(response))
+        return (EU)
+        // return answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1)
       }
     )
     factor(params.R1Alpha * expectedUtility);
@@ -808,7 +820,7 @@ var R0_test = R0(question, context_extended)
 console.log("R0:")
 terminalViz(R0_test, 4)
 
-var R0Ext_test = R0_extended(question, context_extended)
+var R0Ext_test = R1ContextFree(question, context_extended)
 
 console.log("R0 (extended):")
 terminalViz(R0Ext_test, 4)
