@@ -205,7 +205,7 @@ var R1WHResponses = setsOfBakedGoods;
 //   pieCakeContextMinimal,
 //   {
 //     name : "minimal-with-preferences",
-//     // respondant knows true answer
+//     // respondent knows true answer
 //     R0PriorOverWorlds: Delta({v: 'lemonCake'}),
 //     // no preferences over baked goods
 //     questions: [
@@ -400,7 +400,7 @@ var pieCakeContextUnbiasedNoPref = extend(
   pieCakeContext,
   {
     name : "pieCake-no-prefs",
-    // respondant knows true answer
+    // respondent knows true answer
     R0PriorOverWorlds: Delta({v: 'lemonCake'}),
     // no preferences over baked goods
     decisionProblem: function(w, a) {
@@ -519,7 +519,7 @@ var questionUtility = function(utterance, beliefs, context) {
 // responder wants to bring questioner's beliefs and/or action policy
 // as close to their own as possible
 var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta) {
-  // respondant wants to *minimize* KL b/w beliefs (bringing closer to own belief)
+  // respondent wants to *minimize* KL b/w beliefs (bringing closer to own belief)
   var epistemicUtility = -KL(beliefs1, beliefs2);
   var actionUtility = -KL(relevanceProjection(beliefs1, context),
                           relevanceProjection(beliefs2, context));
