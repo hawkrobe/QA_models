@@ -562,18 +562,18 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context) {
 var Q1 = cache(function(context) {
   return Infer({method: 'enumerate'}, function(){
     var question = uniformDraw(context.questions);
-//     console.log('considering question', question.queried);
+    // console.log('considering question', question.queried);
     var expectedUtility = expectation(context.questionerBeliefs, function(trueWorld) {
-//       console.log('in possible world', trueWorld);
+      // console.log('in possible world', trueWorld);
       var possibleResponses = R0(question, extend(context, {
         R0PriorOverWorlds: Delta({v: trueWorld})
-      }));
-//       console.log('respondent: ', possibleResponses)
+      }))
+      // console.log('respondent: ', possibleResponses)
       return expectation(possibleResponses, function(response) {
-//         console.log('considering response ', response );
+        // console.log('considering response ', response );
         var currBeliefs = context.questionerBeliefs;
         var updatedBeliefs = updateBeliefsPragmatic(currBeliefs, question, response, context);
-        return questionUtility(question.text, updatedBeliefs, context);
+        return questionUtility(response, updatedBeliefs, context);
       });
     });
 //     console.log('expected utility: ',expectedUtility)
