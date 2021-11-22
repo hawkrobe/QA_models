@@ -86,7 +86,7 @@ var params = {
   R1Alpha         : 5,
   relevanceBetaR0 : 0,     // beta=1 for only action-utility
   relevanceBetaR1 : 0.99,   //
-  costWeight      : 0.5
+  costWeight      : 0.1
 };
 
 //  --------------------------
@@ -248,7 +248,7 @@ var pieCakeContext = {
     {type: 'single-item', queried: ['raspCake'], text: 'Raspberry cake?'},
     {type: 'polar-disjunct', queried: ['lemonPie', 'raspPie', 'lemonPie+raspPie'], text: 'Pie?'},
     {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonCake+raspCake'], text: 'Cake?'},
-//     {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonPie', 'raspPie'], text: 'Anything?'},
+    {type: 'polar-disjunct', queried: ['lemonCake', 'raspCake', 'lemonPie', 'raspPie'], text: 'Anything?'},
     // MF additional disjunctions
     {type: 'polar-disjunct', queried: ['lemonPie', 'lemonCake', 'lemonPie+lemonCake'], text: 'Anything w/ lemon?'},
     {type: 'polar-disjunct', queried: ['raspPie', 'raspCake', 'raspPie+raspCake'], text: 'Anything w/ raspberry?'},
@@ -473,11 +473,11 @@ var pieCakeContextBiasedPessimist = extend(
       vs: setsOfBakedGoods,
       ps: map(
         function (x) {
-          return (x == 'nothing' ? 100 :
-                  x.split('+').length == '1' ? 10 :
+          return (x == 'nothing' ? 10000 :
+                  x.split('+').length == '1' ? 100 :
                   x.split('+').length == '2' ? 1 :
-                  x.split('+').length == '3' ? 0.1 :
-                  x.split('+').length == '4' ? 0.01 :
+                  x.split('+').length == '3' ? 0.01 :
+                  x.split('+').length == '4' ? 0.0001 :
                   0.000000001)
         },
         setsOfBakedGoods
@@ -883,7 +883,43 @@ var consoleOut = function() {
 // function to call when using RwebPPL
 var makeR = function(){
 
-  console.log("Starting task: ", RInput[0].task)
+  console.log("Starting task: ", RInput[0].task, RInput[0].task == "safeAnswererPositive")
+
+  if (RInput[0].task == "safeAnswererNegative") {
+    console.log("here really?")
+    // R0 (safe answerer) giving a positive response to disjunctive question
+    var context = pieCakeContextUnbiasedNoPref // neutral context
+    var question = context.questions[7]; // anything w/ raspberry?
+    var world = setsOfBakedGoods[11];     // RP+LC
+    console.log("Context: " , context.name)
+    console.log("Question: " , question.text)
+    console.log("World: " , world)
+    var context_extended = extend(context, {
+      R0PriorOverWorlds: Delta({v: world}),
+      R1PriorOverWorlds: Delta({v: world}),
+    });
+    var R0test = R0( question,  context_extended )
+    terminalViz(R0test)
+    return R0test
+  }
+
+  if (RInput[0].task == "safeAnswererPositive") {
+    console.log("here?")
+    // R0 (safe answerer) giving a positive response to disjunctive question
+    var context = pieCakeContextUnbiasedNoPref // neutral context
+    var question = context.questions[8]; // anything w/ raspberry?
+    var world = setsOfBakedGoods[9];     // RP+LC
+    console.log("Context: " , context.name)
+    console.log("Question: " , question)
+    console.log("World: " , world)
+    var context_extended = extend(context, {
+      R0PriorOverWorlds: Delta({v: world}),
+      R1PriorOverWorlds: Delta({v: world}),
+    });
+    var R0test = R0( question,  context_extended )
+    terminalViz(R0test)
+    return R0test
+  }
 
   if (RInput[0].task == "R1Responses_BinaryPrefs") {
     // R1 (averager) response selection
@@ -927,6 +963,7 @@ var makeR = function(){
     Q1(context)
   }
 }
+console.log("check!")
 
 makeR()
 // consoleOut()

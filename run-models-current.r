@@ -31,7 +31,7 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
         TRUE ~ "no_highlight"
       )
     ) %>%
-    filter(prob != 0) %>%
+    filter(prob >= 1e-20) %>%
     ggplot(aes(
       x = support,
       y = prob,
@@ -49,6 +49,9 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
 
 }
 
+run_plot_model(task_name = "safeAnswererPositive")
+run_plot_model(task_name = "safeAnswererNegative")
+
 run_plot_model(task_name = "pieCakeContextMinimal")
 run_plot_model(task_name = "pieCakeContextMinimalWithPreferences",
                highlight1 = "RP?",
@@ -56,10 +59,10 @@ run_plot_model(task_name = "pieCakeContextMinimalWithPreferences",
                highlight3 = c("AS?", "SC?"))
 run_plot_model(task_name = "pieCakeContext")
 run_plot_model(task_name = "pieCakeContextAdditivePreferences", highlight1 = "Anything w/ raspberry?", highlight2 = "Anything w/ lemon?", highlight3 = "Pie?", highlight4 = "Cake?")
-run_plot_model(task_name = "pieCakeContextBiasedPessimist", highlight1 = "Which pies?", highlight2= "Anything?")
-run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "-against-pessimist", highlight1 = "Which pies?", highlight2= "Anything?")
+run_plot_model(task_name = "pieCakeContextBiasedPessimist", highlight1 = "Which goods?", highlight2= "Anything?")
+run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "-against-pessimist", highlight1 = "Which goods?", highlight2= "Anything?")
 run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "no-highlight")
-run_plot_model(task_name = "pieCakeContextBiasedNoPref", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?", "Lemon cake?"))
+run_plot_model(task_name = "pieCakeContextBiasedNoPref", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?"))
 run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "-against-opinionated", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?", "Lemon cake?"))
 
 
