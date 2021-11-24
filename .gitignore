@@ -1,0 +1,17 @@
+/02-deprecated-model-variants/02-sequential-decisions-with-safe-answers/safe-answers-sequential-decisions_cache/
+/02-deprecated-model-variants/02-sequential-decisions-with-safe-answers/safe-answers-sequential-decisions_files/
+*.Rhistory
+
+*.log
+*.aux
+*.bbl
+*.pdf
+*.blg
+*.gz
+*-blx.bib
+*.out
+*.rel
+*.bst
+*.run.xml
+.DS_Store
+auto

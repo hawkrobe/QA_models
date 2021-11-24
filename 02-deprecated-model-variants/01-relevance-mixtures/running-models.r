@@ -1,12 +1,12 @@
 library(rwebppl)
 library(tidyverse)
-library(aida) # remotes::install_github("michael-franke/aida-package")
+library(aida)
 
 
 run_plot_model <- function (context_name = "pieCakeContext", questionerUtilFct = "KL") {
   webPPL_data = tibble('context' = context_name, 'questionerUtilFct' = questionerUtilFct)
   webppl(
-    program_file = "qa-models-sequential-decisions.webppl",
+    program_file = "qa-models.webppl",
     data = webPPL_data,
     data_var = "myDF"
   ) -> output
@@ -18,20 +18,15 @@ run_plot_model <- function (context_name = "pieCakeContext", questionerUtilFct =
     geom_col(fill = "#505B55") + coord_flip() +
     xlab("") +
     ylab("") +
-    ggtitle(context_name) + 
     theme_aida()
 
   factor = 3
 
-  ggsave(filename = str_c("pics/results-", context_name, ".pdf"), width = 16/factor, height = 9/factor)
+  ggsave(filename = str_c("results-", context_name, ".pdf"), width = 16/factor, height = 9/factor)
 
-  output
-  
 }
 
-run_plot_model("pieCakeContextMinimal")
-run_plot_model("pieCakeContextMinimalWithPreferences")
+run_plot_model("neutralContext")
 run_plot_model("pieCakeContext")
-run_plot_model("pieCakeContextAdditivePreferences")
 run_plot_model("pieCakeContextBiasedNoPref")
 run_plot_model("pieCakeContextUnbiasedNoPref")
