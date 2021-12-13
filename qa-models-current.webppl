@@ -175,6 +175,7 @@ var pieCakeContextMinimal = {
   decisionProblem: function(w, a) {
     return _.includes(w, a) ? 1 : 0;
   },
+  // semantics of responses (in the context of a question)
   meaning: function(world, question, response) {
     if(response == '') {
       // assume silence has null meaning
@@ -185,7 +186,10 @@ var pieCakeContextMinimal = {
               response == 'no' ?  (! _.includes(question.queried, world)) : 0);
     } else if(question.type == 'wh') {
       return world == response;
-    } else {
+    } else if(question.type == 'no-question') {
+      return true;
+    }
+    else {
       return console.error('question type not yet supported: ' + question.type);
     }
   },
@@ -195,7 +199,10 @@ var pieCakeContextMinimal = {
       return ['yes', 'no'];
     } else if(question.type == 'wh') {
       return bakedGoodsMinimal;
-    } else {
+    } else if(question.type == 'no-question') {
+      return ['yes'] // TODO: check which response best to give to no question
+    }
+    else {
       return console.error('question type not yet supported: ' + question.type);
     }
   }
@@ -951,17 +958,21 @@ var makeR = function(){
 
 var continuousInference = function(){
 
-  var getScore = function(RP, LC, SC, AS) {
+  var getScore = function(RP, LC) {
     // build context with parameters
     var c =   extend(
       pieCakeContextMinimal,
       {
+        questions: [
+          {type: 'polar-disjunct', queried: ['RP'], text: 'RP?'},
+          {type: 'polar-disjunct', queried: ['LC'], text: 'LC?'},
+//           {type: 'wh', queried: bakedGoodsMinimal, text: 'which?'},
+          {type: 'no-question', queried: [], text: 'no-Q'}
+        ],
         decisionProblem: function(w, a) {
-          return _.includes(w, a) ? (
-            a == 'RP' ? RP  :
-              a == 'LC' ? RP+LC :
-              a == 'SC' ? RP+SC :
-              1+AS) : 0;
+          return a == 'no-order' ? 0 :
+            _.includes(w, a) ? (
+              a == 'RP' ? RP  : RP+LC) : -1;
         }
       });
     // questioner choice & score
@@ -971,21 +982,21 @@ var continuousInference = function(){
   }
 
   var continuousInference = Infer(
-    {method: "MCMC", samples: 1000},
+    {method: "MCMC", samples: 2000},
     function() {
       // RP is the reference level
       var RP = gaussian({mu: 0, sigma: 5});;
       // 'coefficients': deviation from reference level
-      var LC = gaussian({mu: 0, sigma: 5});
-      var SC = gaussian({mu: 0, sigma: 5});
-      var AS = gaussian({mu: 0, sigma: 5});
-      factor(getScore(RP,LC,SC,AS))
-      var out = LC;
-      return ({out})
+      var LC = gaussian({mu: 0, sigma: 2});
+      factor(getScore(RP,LC))
+      var out = {RP: RP, LC: LC};
+      return (out)
     }
   )
-
-  viz(continuousInference)
+  var cI = continuousInference
+  viz(cI)
+  viz(marginalize(cI, "RP"))
+  viz(marginalize(cI, "LC"))
 
 }
 
