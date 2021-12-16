@@ -83,11 +83,12 @@ var powerset = function(set) {
 var params = {
   R0Alpha         : 0.0001,
   policyAlpha     : 1.5,
-  questionerAlpha : 3,
+  questionerAlpha : 4,
   R1Alpha         : 5,
   relevanceBetaR0 : 0,     // beta=1 for only action-utility
   relevanceBetaR1 : 0.9,   //
-  costWeight      : 0.1
+  costWeight      : 0.1,
+  questionCost    : 0.25    // cost for a question (relative to no question)
 };
 
 //  --------------------------
@@ -633,7 +634,8 @@ var Q1 = function(context) {
       });
     });
     //     console.log('expected utility: ',expectedUtility)
-    factor(params.questionerAlpha * expectedUtility);
+    var questionCost = question.type == 'no-question' ? 0 : params.questionCost;
+    factor(params.questionerAlpha * (expectedUtility - questionCost));
     return question.text;
   });
 };
@@ -873,9 +875,15 @@ var makeR = function(){
 
   console.log("Starting task: ", RInput[0].task, RInput[0].task == "safeAnswererPositive")
 
+  if (RInput[0].task == "continuousInference") {
+    // two-parameter continuous inference of preferences
+    var cI = getContInf()
+    console.log("CI")
+    return cI
+  }
+
   if (RInput[0].task == "safeAnswererNegative") {
-    console.log("here really?")
-    // R0 (safe answerer) giving a positive response to disjunctive question
+    // R0 (safe answerer) giving a negative response to disjunctive question
     var context = pieCakeContextUnbiasedNoPref // neutral context
     var question = context.questions[7]; // anything w/ raspberry?
     var world = setsOfBakedGoods[11];     // RP+LC
@@ -892,7 +900,6 @@ var makeR = function(){
   }
 
   if (RInput[0].task == "safeAnswererPositive") {
-    console.log("here?")
     // R0 (safe answerer) giving a positive response to disjunctive question
     var context = pieCakeContextUnbiasedNoPref // neutral context
     var question = context.questions[8]; // anything w/ raspberry?
@@ -956,61 +963,78 @@ var makeR = function(){
 // inferring continuous preferences
 // ///////////////////////////////////////////////
 
-var continuousInference = function(){
+// build a context representation for a given pair of
+// payoff parameters
+var makeContext = function(RP, LC) {
+  extend(
+    pieCakeContextMinimal,
+    {
+      questions: [
+        {type: 'polar-disjunct', queried: ['RP'], text: 'RP?'},
+        {type: 'polar-disjunct', queried: ['LC'], text: 'LC?'},
+        // {type: 'wh', queried: bakedGoodsMinimal, text: 'which?'},
+        {type: 'no-question', queried: [], text: 'no-Q'}
+      ],
+      decisionProblem: function(w, a) {
+        return a == 'no-order' ? 0 :
+        _.includes(w, a) ? (
+          a == 'RP' ? RP  : RP+LC) : -1;
+      }
+    });
+}
+
+var getContInf = function(){
 
   var getScore = function(RP, LC) {
     // build context with parameters
-    var c =   extend(
-      pieCakeContextMinimal,
-      {
-        questions: [
-          {type: 'polar-disjunct', queried: ['RP'], text: 'RP?'},
-          {type: 'polar-disjunct', queried: ['LC'], text: 'LC?'},
-//           {type: 'wh', queried: bakedGoodsMinimal, text: 'which?'},
-          {type: 'no-question', queried: [], text: 'no-Q'}
-        ],
-        decisionProblem: function(w, a) {
-          return a == 'no-order' ? 0 :
-            _.includes(w, a) ? (
-              a == 'RP' ? RP  : RP+LC) : -1;
-        }
-      });
+    var c =  makeContext(RP, LC);
     // questioner choice & score
     var questioner = Q1(c)
     var score = questioner.score('RP?')
     return(score)
   }
 
-  var continuousInference = Infer(
-    {method: "MCMC", samples: 2000},
+  var contInf = Infer(
+    {method: "MCMC", samples: 4000},
     function() {
       // RP is the reference level
-      var RP = gaussian({mu: 0, sigma: 5});;
+      var RP = gaussian({mu: 2, sigma: 2});;
       // 'coefficients': deviation from reference level
-      var LC = gaussian({mu: 0, sigma: 2});
+      var LC = gaussian({mu: 0, sigma: 1});
       factor(getScore(RP,LC))
       var out = {RP: RP, LC: LC};
       return (out)
     }
   )
-  var cI = continuousInference
-  viz(cI)
-  viz(marginalize(cI, "RP"))
-  viz(marginalize(cI, "LC"))
+
+  return(contInf)
 
 }
 
+var continuousInference = function(){
+  var cI = getContInf()
+  viz(cI)
+  viz(marginalize(cI, "RP"))
+  viz(marginalize(cI, "LC"))
+}
 
-////////////////////////////////////////////////////////
-// control center:
-// some functions only work in the browser
+var consoleOutQ1ContInf = function(RP, LC) {
+  console.log('question probs with: RP =', RP, 'LC =', LC)
+  terminalViz(Q1(makeContext(RP,LC)))
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+// control center      : functions only work in the browser
 // ---
-// makeR : use in connection with 'run_models_current.r'
-// consoleOut : use w/ terminal for dev
-// continuousInference : use in webppl.org (plotting)
-// /////////////////////////////////////////////////////
+// makeR               : use in connection with 'collect-webppl-results.r'
+// consoleOut          : use w/ terminal for dev
+// continuousInference : use in webppl.org (plotting) of contin. Inference
+// consoleOutQ1Cont    : use w/ terminal for dev Q1 beh. in cont. Inference
+// /////////////////////////////////////////////////////////////////////////
 
 
-// makeR()
+makeR()
 // consoleOut()
-continuousInference()
+// continuousInference()
+// consoleOutQ1ContInf(5,-1)

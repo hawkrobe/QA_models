@@ -16,7 +16,7 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
   if (nr_highlight_levels == 0) {
     highlight_values = "#505B55"
   } else {
-    highlight_values = c(c("#B04035","#FFA811", "#6494ED", "#006600")[1:nr_highlight_levels], "#505B55")
+    highlight_values = c(c("#B04035", "#FFA811", "#6494ED", "#006600")[1:nr_highlight_levels], "#505B55")
   }
 
   output %>%
@@ -69,3 +69,51 @@ run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = 
 run_plot_model(task_name = "R1Responses_BinaryPrefs")
 run_plot_model(task_name = "R1Posterior_BinaryPrefs")
 
+
+## get data for continuous inference
+
+webPPL_data = tibble('task' = "continuousInference")
+contInf_data <- webppl(
+    program_file = "qa-models-current.webppl",
+    data = webPPL_data,
+    data_var = "RInput"
+  ) %>% 
+  pivot_wider(id_cols = Iteration, names_from = Parameter, values_from = value)
+  
+contInf_data %>%   mutate(RP_smaller = RP<LC) %>% 
+    ggplot(aes(x=RP, y=LC, color = RP_smaller)) +
+  geom_point(size=0.8, alpha = 0.3) + theme_aida() +
+  theme(legend.position = "none") +
+  xlim(-5,10) + ylim(-5,10) +
+  scale_color_manual(values=highlight_values[c(3,5)])
+
+factor = 3
+ggsave(filename = paste0("pics/results-", "continuousInference", ".pdf"), width = 9/factor, height = 6/factor)
+
+message("Posterior of RP > 0: ", mean(contInf_data$RP > 0))
+message("Posterior of LC > 0: ", mean(contInf_data$LC > 0))
+message("Posterior of RP > LP: ", mean(contInf_data$RP > contInf_data$LC))
+
+
+        
+highlight_values = c("#B04035", "#FFA811", "#6494ED", "#006600", "#505B55")
+## prior plot
+prior_samples <- tibble(RP = rnorm(4000,2,2),
+       LC = RP + rnorm(4000,0,1),
+       RP_smaller = RP < LC) 
+
+message("Prior of RP > 0: " , mean(prior_samples$RP > 0))
+message("Prior of LC > 0: " , mean(prior_samples$LC > 0))
+message("Prior of RP > LP: ", mean(prior_samples$RP > prior_samples$LC))
+
+
+prior_samples %>% 
+  ggplot(aes(x=RP, y=LC, color = RP_smaller)) +
+  geom_point(size=0.8, alpha = 0.3) + theme_aida() +
+  theme(legend.position = "none") +
+  xlim(-5,10) + ylim(-5,10) +
+  scale_color_manual(values=highlight_values[c(3,5)])
+  
+factor = 3
+ggsave(filename = paste0("pics/results-", "continuousInference-prior", ".pdf"), width = 9/factor, height = 6/factor)
+  
