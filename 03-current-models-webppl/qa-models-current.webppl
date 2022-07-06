@@ -692,6 +692,7 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext) {
   )
 })
 
+// R1Sampler is a sampling-based non-normative agent
 var R1Sampler = cache(function(context, R1PriorContext, question) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
@@ -712,6 +713,7 @@ var R1Sampler = cache(function(context, R1PriorContext, question) {
   });
 });
 
+// R1 Averager is full rational reasoner, it's what we use preferably
 var R1Averager = cache(function(context, R1PriorContext, question) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
