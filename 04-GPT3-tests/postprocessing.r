@@ -81,4 +81,3 @@ GPT3Pred %>%
   xlab('answer type') +
   ylab('prediction') + 
   theme(strip.text.y = element_text(angle = 0))
-
