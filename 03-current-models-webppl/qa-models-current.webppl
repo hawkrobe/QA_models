@@ -76,34 +76,7 @@ var powerset = function(set) {
   }
 };
 
-//  -------------------
-// | global parameters |
-//  -------------------
-
-var params = {
-  R0Alpha         : 0.0001,
-  policyAlpha     : 1.5,
-  questionerAlpha : 4,
-  R1Alpha         : 5,
-  relevanceBetaR0 : 0,     // beta=1 for only action-utility
-  relevanceBetaR1 : 0.9,   //
-  costWeight      : 0.1,
-  questionCost    : 0.25    // cost for a question (relative to no question)
-};
-
-//  --------------------------
-// | preparing context models |
-//  --------------------------
-
-var bakedGoods = ['raspPie', 'raspCake', 'lemonPie', 'lemonCake'];
-var bakedGoodsMinimal = ['RP', 'LC', 'SC', 'AS'];
-
-// create string representation of all subsets of baked goods
-var setWithEmptyListElement = map(
-  function(v){return v.join('+');},
-  // add possibility to encode background knowledge of number k of available goods
-  filter(function(x) {return x.length <= 4}, powerset(bakedGoods))
-);
+// replace empty string with word 'nothing'
 var replaceEmptyListWithStringNothing = function(set) {
   _.concat(filter(
     function(x) {
@@ -114,32 +87,171 @@ var replaceEmptyListWithStringNothing = function(set) {
     set
   ), "nothing");
 }
-var setWithStringNothing = replaceEmptyListWithStringNothing(setWithEmptyListElement);
-var setsOfBakedGoods = setWithStringNothing;
 
-// build response set for pragmatic respondent (R1)
-var sampleR1PolarResponses = Infer(
-  {method: 'enumerate'},
-  function() {
-    var yesNoPart = uniformDraw(["yes", "no"]);
-    var itemPart = uniformDraw(_.concat(filter(
-      function(x) {
-        if (x != "") {
-          return x
-        }
+//  -------------------
+// | global parameters |
+//  -------------------
+
+var params = {
+  R0Alpha         : 0.0001,
+  policyAlpha     : 2.5,
+  questionerAlpha : 4,
+  R1Alpha         : 3,
+  relevanceBetaR0 : 0,     // beta=1 for only action-utility
+  relevanceBetaR1 : 0.95,   //
+  costWeight      : 0.45,
+  questionCost    : 0.25    // cost for a question (relative to no question)
+};
+
+//  -----------------------------------------------
+// | helper functions for preparing context models |
+//  -----------------------------------------------
+//
+// Context models are built from a set of 'atoms', e.g.,
+// the whole set of single entities in the domain.
+//
+// The function 'prepareContextSets' returns a dictionary
+// with:
+// * the set of all world states (power set of atoms),
+// * the set of all licensed responses for R1 to a WH question
+// * the set of all licensed responses for R1 to a polar question
+//
+// The function 'meaningFunction' is the generic semantic function
+// to be used in (non-minimal) cases where more than one element/item
+// can be true/present.
+// TODO: check if the meaning function for the minimal context models
+// can be subsumed under this one.
+
+var prepareContextSets = function(atoms) {
+
+  // The function 'makePowerSet' takes a list of atoms as input and
+  // returns an array of strings describing each world state
+  // (e.g., which items are present).
+  var makePowerSet = function (atoms) {
+    // create string representation of all subsets of atoms
+    var setWithEmptyListElement = map(
+      function(v){return v.join('+');},
+      // add possibility to encode background knowledge of number k of available goods
+      filter(function(x) {return x.length <= 8}, powerset(atoms))
+    );
+    return(replaceEmptyListWithStringNothing(setWithEmptyListElement));
+  };
+
+  // The function 'makeR1polarResponses' takes the atoms and the power set and
+  // creates all licensed R1 responses to a polar question.
+  var makeR1polarResponses = function(atoms, powerSet) {
+
+    var sampleR1PolarResponses = Infer(
+      {method: 'enumerate'},
+      function() {
+        var yesNoPart = uniformDraw(["yes", "no"]);
+        var itemPart = uniformDraw(_.concat(filter(
+          function(x) {
+            if (x != "") {
+              return x
+            }
+          },
+          powerSet
+        ), "---", "nothing"));
+        return [yesNoPart, itemPart].join(".")
+      }
+    )
+
+    // exclude utterance 'no, we have ... exhaustive list of everything'
+    // and 'yes, we have nothing'
+    var x = map(function(a) {a == atoms[0] ? a : a + "+" }, atoms.reverse())
+    var contradiction = reduce(function(a, acc) { acc + a }, "no.", x)
+
+    var R1PolarResponses = filter(
+      function(r) {
+        // some responses can never be true
+        r != "yes.nothing" && r != contradiction
       },
-      setsOfBakedGoods
-    ), "---", "nothing"));
-    return [yesNoPart, itemPart].join(".")
+      sampleR1PolarResponses.support());
+    return(R1PolarResponses)
   }
-)
-var R1PolarResponses = filter(
-  function(r) {
-    // some responses can never be true
-    r != "yes.nothing" && r != "no.raspPie+raspCake+lemonPie+lemonCake"
-  },
-  sampleR1PolarResponses.support());
-var R1WHResponses = setsOfBakedGoods;
+
+  var powerSet = makePowerSet(atoms);
+
+  // return powerset, R1 licencesed responses
+  var out = {
+    'atoms'            : atoms,
+    'powerSet'         : powerSet,
+    'R1WHResponses'    : powerSet,
+    'R1PolarResponses' : makeR1polarResponses(atoms, powerSet)
+  }
+  return(out)
+}
+
+
+var meaningFunction = function(world, question, response) {
+
+  // meaning of literals / atoms
+  var meaning_atomic = function(world, question, response) {
+    // console.log(" *** now evaluating response: part ", response)
+    if(response == '' || response == "---") {
+      // assume silence has null meaning
+      return true;
+    }
+    if(response == "nothing") {
+      if(world == "nothing") {
+        return true;
+      }
+    }
+    if(world == "nothing" && question.type == 'wh') {
+      return response == "nothing";
+    }
+    if(question.type == 'single-item') {
+      return (
+        response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+          response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+          all(function(item) {
+            return _.includes(world.split('+'), item);
+          }, response.split('+')));
+      // return (
+      //   response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+      //     response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+      //     console.error('Not a valid response to question:', question, response));
+    } else
+      if(question.type == 'polar-disjunct') {
+        return (
+          response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+            response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+            all(function(item) {
+              return _.includes(world.split('+'), item);
+            }, response.split('+')));
+      } else if(question.type == 'wh') {
+        // assume response is true when the shop contains every mentioned item
+        return all(function(item) {
+          return _.includes(world.split('+'), item);
+        }, response.split('+'));
+      } else {
+        return console.error('question type not yet supported: ' + question.type);
+      }
+  }
+
+  // meaning of conjunctions
+
+  return all(
+    function (r) {
+      meaning_atomic(world, question, r)
+    },
+    _.split(response, '.')
+  )
+
+}
+
+
+//  --------------------------
+// | preparing context models |
+//  --------------------------
+
+/////////////////////////////////////////////////////////////
+// minimal context model (exactly one element true/available)
+/////////////////////////////////////////////////////////////
+
+// minimal atoms
+var bakedGoodsMinimal = ['RP', 'LC', 'SC', 'AS'];
 
 var pieCakeContextMinimal = {
   name : "minimal",
@@ -220,7 +332,16 @@ var pieCakeContextMinimalWithPreferences = extend(
   }
 )
 
+/////////////////////////////////////////////
 // richer context w/ powerset of baked goods
+/////////////////////////////////////////////
+
+// full power-set baked goods examples (from presentations)
+var bakedGoods = ['raspPie', 'raspCake', 'lemonPie', 'lemonCake'];
+var bakeryContextSets = prepareContextSets(bakedGoods);
+var setsOfBakedGoods  = bakeryContextSets.powerSet;
+var R1WHResponses     = bakeryContextSets.R1WHResponses;
+var R1PolarResponses  = bakeryContextSets.R1PolarResponses;
 
 var pieCakeContext = {
   name : "pieCake-prefs",
@@ -291,62 +412,7 @@ var pieCakeContext = {
             R1WHResponses : R1PolarResponses)
   },
   // semantic meaning function
-  meaning: function(world, question, response) {
-
-    // meaning of literals / atoms
-    var meaning_atomic = function(world, question, response) {
-      // console.log(" *** now evaluating response: part ", response)
-      if(response == '' || response == "---") {
-        // assume silence has null meaning
-        return true;
-      }
-      if(response == "nothing") {
-        if(world == "nothing") {
-          return true;
-        }
-      }
-      if(world == "nothing" && question.type == 'wh') {
-        return response == "nothing";
-      }
-      if(question.type == 'single-item') {
-        return (
-          response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
-            response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
-            all(function(item) {
-              return _.includes(world.split('+'), item);
-            }, response.split('+')));
-        // return (
-        //   response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
-        //     response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
-        //     console.error('Not a valid response to question:', question, response));
-      } else
-        if(question.type == 'polar-disjunct') {
-          return (
-            response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
-              response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
-              all(function(item) {
-                return _.includes(world.split('+'), item);
-              }, response.split('+')));
-        } else if(question.type == 'wh') {
-          // assume response is true when the shop contains every mentioned item
-          return all(function(item) {
-            return _.includes(world.split('+'), item);
-          }, response.split('+'));
-        } else {
-          return console.error('question type not yet supported: ' + question.type);
-        }
-    }
-
-    // meaning of conjunctions
-
-    return all(
-      function (r) {
-        meaning_atomic(world, question, r)
-      },
-      _.split(response, '.')
-    )
-
-  }
+  meaning: meaningFunction
 };
 
 // amended context with feature-based (additive) preferences
@@ -479,6 +545,78 @@ var pieCakeContextBiasedPessimist = extend(
 // response cost is proportional to length in words
 var cost = function(response) {
   return _.includes(response, "---") ? 0 : params.costWeight * (response.split('+').length);
+};
+
+////////////////////////////////////////////////////////////////////
+// 'tso' : 'target-same-other' example used in the first experiments
+////////////////////////////////////////////////////////////////////
+
+var tsoAtoms = ['target', 'competitor', 'sameCat', 'otherCat1', 'otherCat2']
+
+var tsoContextSets      = prepareContextSets(tsoAtoms);
+var tsoPowerSet         = tsoContextSets.powerSet;
+var tsoR1WHResponses    = tsoContextSets.R1WHResponses;
+// var tsoR1PolarResponses = tsoContextSets.R1PolarResponses;
+var tsoR1PolarResponses = [
+  'no.---',
+  'no.competitor',
+  'no.competitor+sameCat',
+  'no.otherCat1+otherCat2',
+  'no.competitor+sameCat+otherCat1+otherCat2'
+]
+
+var tsoContext = {
+  name : "tsoContext",
+  worlds : tsoPowerSet,
+  actions: _.concat(tsoAtoms, "nothing"),
+  questions: [
+    {type: 'single-item', queried: ['target'], text: 'Target?'},
+    {type: 'single-item', queried: ['competitor'], text: 'Competitor?'},
+    {type: 'single-item', queried: ['sameCat'], text: 'Same Cagegory?'},
+    {type: 'single-item', queried: ['otherCat1'], text: 'Other Category 1?'},
+    {type: 'single-item', queried: ['otherCat2'], text: 'Other Category 2?'},
+    {type: 'wh', queried: tsoAtoms, text: 'Which elements?'},
+  ],
+  questionerBeliefs: Categorical({vs: tsoPowerSet}),
+  R0PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat1+otherCat2'}),
+  R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat1+otherCat2'}),
+  decisionProblem: function(w, a) {
+    return _.includes(w, a) ?
+      (a == 'target' ? 7 :
+       a == 'competitor' ? 6 :
+       a == 'sameCat' ? 4 : 1) :
+      0.0000001;
+  },
+
+  // R0 chooses among responses licensed by the question
+  getLicensedResponsesR0: function(question) {
+    if(question.type == 'single-item') {
+      // by definition polar questions require 'yes'/'no' answer
+      return ['yes', 'no'];
+    } else if(question.type == 'polar-disjunct') {
+      // by definition polar questions require 'yes'/'no' answer
+      var answers = ['yes', 'no'].concat(question.queried);
+      return answers;
+    } else if(question.type == 'wh') {
+      // 'wh' questions allow you to say any set of queried items,
+      // or to say "nothing" when none of the querried items exist
+      return replaceEmptyListWithStringNothing(
+        map(
+          function(v){return v.join('+');},
+          powerset(question.queried)
+        ));
+    } else {
+      return console.error('question type not yet supported: ' + question.type);
+    }
+  },
+
+  // R1 chooses among responses licensed by the question
+  getLicensedResponsesR1: function(question) {
+    return (question.type == 'wh' ?
+            tsoR1WHResponses : tsoR1PolarResponses)
+  },
+  // semantic meaning function
+  meaning: meaningFunction
 };
 
 //  -----------
@@ -1027,6 +1165,127 @@ var consoleOutQ1ContInf = function(RP, LC) {
 
 
 ////////////////////////////////////////////////////////////////////////////
+// dev corner
+////////////////////////////////////////////////////////////////////////////
+
+var devFun = function() {
+
+  var context = tsoContext;
+  console.log('context: \t', context.name);
+
+  var question = context.questions[0];
+  console.log('question: \t', question.text)
+
+  var world = 'competitor+sameCat+otherCat1+otherCat2';
+  console.log('world: \t\t', world);
+
+  var responsesR0 = context.getLicensedResponsesR0
+  console.log('R0 resp. set: \t', responsesR0(question))
+
+  var responseR0 = responsesR0(question)[0]
+  console.log('response R0: \t', responseR0)
+
+  var meaning = context.meaning
+  console.log('truth R0 r.: \t', meaning(world,question,responseR0));
+
+  var responsesR1 = context.getLicensedResponsesR1
+  // console.log('R1 resp. set \t: ', responsesR1(question))
+
+  // map(
+  //   function(world) {
+  //     console.log("In world ('"+ world +"') the following of R1's responses are true: \n",
+  //                 filter(function (r) {
+  //                   meaning(world,question,r)
+  //                 },
+  //                        responsesR1(question))
+  //                )
+  //   },
+  //   setsOfBakedGoods
+  // )
+
+  var responseR1 = responsesR1(question)[0]
+  console.log('response R1: \t', responseR1)
+
+  var meaning = context.meaning
+  console.log('truth R1 r.: \t', meaning(world,question,responseR1));
+
+  var R0_test = R0(question, context)
+
+  console.log("R0:")
+  terminalViz(R0_test, 4)
+
+  // var R0Ext_test = R1ContextFree(question, context)
+  // console.log("R0 (extended):")
+  // terminalViz(R0Ext_test, 4)
+
+  // ---------------------------------------------
+  // testing R1 with full knowledge of preferences
+  // ---------------------------------------------
+
+  // R1 knows full context model
+  var R1Prior_FullKnowledge = {
+    trueWorld: tsoContext,
+    distribution: Categorical({vs: ["trueWorld"]})
+  }
+
+  var R1posterior = R1ContextPosterior(tsoContext, question, R1Prior_FullKnowledge);
+  console.log("Posterior inference (trivial)")
+  terminalViz(marginalize(R1posterior, 'label'),4)
+
+  var R1Prediction = R1Averager(tsoContext, R1Prior_FullKnowledge, question)
+  console.log("R1-Averager (full knowledge):")
+  terminalViz(R1Prediction,4)
+
+  // -------------------------------------
+  // testing belief & preference inference
+  // -------------------------------------
+
+
+  // // belief inference
+  // var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1);
+  // console.log("Posterior inference (uncertainty about beliefs)")
+  // terminalViz(marginalize(R1posteriorContextBeliefs, 'label'),4)
+
+  // var R1SamplerBeliefInference  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question), 'response')
+  // console.log("R1-Sampler (uncertainty about beliefs):")
+  // terminalViz(R1SamplerBeliefInference,4)
+
+  // var R1AveragerBeliefInference = R1Averager(context_extended, R1PriorContext_beliefsQ1, question)
+  // console.log("R1-Averager (uncertainty about beliefs):")
+  // terminalViz(R1AveragerBeliefInference,4)
+
+  // // preference inference
+  // var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1);
+  // console.log("Posterior inference (uncertainty about preferences)")
+  // terminalViz(marginalize(R1posteriorContextPreference, 'label'),4)
+
+  // var R1SamplerPreferenceInference  = marginalize(R1Sampler(context_extended, R1PriorContext_PreferenceQ1, question), 'response')
+  // console.log("R1-Sampler (uncertainty about preferences):")
+  // terminalViz(R1SamplerPreferenceInference,4)
+
+  // var R1AveragerPreferenceInference = R1Averager(context_extended, R1PriorContext_PreferenceQ1, question)
+  // console.log("R1-Averager (uncertainty about preferences):")
+  // terminalViz(R1AveragerPreferenceInference,4)
+
+  // // binary preference inference
+
+  // var R1posteriorContextPreferenceBinaryQRP = R1ContextPosterior(
+  //   pieCakeContextUnbiasedNoPref,
+  //   context.questions[2],
+  //   R1PriorContext_BinaryPrefs);
+  // console.log("Posterior inference (binary after RP?)")
+  // terminalViz(marginalize(R1posteriorContextPreferenceBinaryQRP, 'label'),4)
+
+  // var R1AveragerPreferenceInferenceBinaryQRP = R1Averager(
+  //   context_extended,
+  //   R1PriorContext_BinaryPrefs,
+  //   context.questions[2])
+  // console.log("R1-Averager (binary preferences & 'RP?'):")
+  // terminalViz(R1AveragerPreferenceInferenceBinaryQRP,4)
+
+}
+
+////////////////////////////////////////////////////////////////////////////
 // control center      : functions only work in the browser
 // ---
 // makeR               : use in connection with 'collect-webppl-results.r'
@@ -1036,7 +1295,11 @@ var consoleOutQ1ContInf = function(RP, LC) {
 // /////////////////////////////////////////////////////////////////////////
 
 
-makeR()
+// makeR()
 // consoleOut()
 // continuousInference()
 // consoleOutQ1ContInf(5,-1)
+
+devFun(); // compare against pilot data from N=50
+          // frequency of answer types:
+          // 0.1267 0.5698 0.2068 0.0000 0.0967
