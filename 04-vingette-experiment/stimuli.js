@@ -1,0 +1,72 @@
+var stimuli = {
+  "cafe-pie": {
+    "settingName": "cafe",
+    "vignette": "You are a server in a café. Today the café has raspberry pie, pasta al forno, lemon cake, chocolate cookies and cheese sandwich.\\n\\nA customer asks: \"Do you have raspberry cake?\"\\n\\nYou reply:",
+    "taciturn": "\"I'm sorry, we don't have raspberry cake today.\"",
+    "competitor": "\"I'm sorry, we don't have raspberry cake today. We have raspberry pie.\"",
+    "sameCategory": "\"I'm sorry, we don't have raspberry cake today. We have raspberry pie, lemon cake, and chocolate cookies.\"",
+    "otherCategory": "\"I'm sorry, we don't have raspberry cake today. We have pasta al forno and cheese sandwich.\"",
+    "fullList": "\"I'm sorry, we don't have raspberry cake today. We have raspberry pie, pasta al forno, lemon cake, chocolate cookies, and cheese sandwich.\"",
+    "itemQuestion": "raspberry cake",
+    "itemCompetitor": "raspberry pie",
+    "itemSameCat1": "chocolate cookies",
+    "itemOtherCat1": "pasta al forno",
+    "itemOtherCat2": "cheese sandwich"
+  },
+  "cafe-pasta": {
+    "settingName": "cafe",
+    "vignette": "You are a server in a café. Today the café has pasta al forno, pizza, lemon cake, chocolate cookies and lasagne.\\n\\nA customer asks: \"Do you have pasta arrabiata?\"\\n\\nYou reply:",
+    "taciturn": "\"I'm sorry, we don't have pasta arrabiata today.\"",
+    "competitor": "\"I'm sorry, we don't have pasta arrabiata today. We have pasta al forno.\"",
+    "sameCategory": "\"I'm sorry, we don't have pasta arrabiata today. We have pasta al forno, pizza, and lasange.\"",
+    "otherCategory": "\"I'm sorry, we don't have pasta arrabiata today. We have lemon cake and chocolate cookies.\"",
+    "fullList": "\"I'm sorry, we don't have pasta arrabiata today. We have pasta al forno, pizza, lemon cake, chocolate cookies, and lasagne.\"",
+    "itemQuestion": "pasta arrabiata",
+    "itemCompetitor": "pasta al forno",
+    "itemSameCat1": "lasagna",
+    "itemOtherCat1": "lemon cake",
+    "itemOtherCat2": "chocolate cookies"
+  },
+  "bar-whiteWine": {
+    "settingName": "bar",
+    "vignette": "You are a bar tender in a hotel bar. The bar serves only whiskey, beer, red wine, soft drinks and coffee today.\\n\\nLate at night a woman walks in. She looks gloomy. She says: \"Do you have white wine?\"\\n\\nYou reply:",
+    "taciturn": "\"I'm sorry, we don't have white wine today.\"",
+    "competitor": "\"I'm sorry, we don't have white wine today.\"",
+    "sameCategory": "\"I'm sorry, we don't have white wine today. We have whiskey, beer, and red wine.\"",
+    "otherCategory": "\"I'm sorry, we don't have white wine today. We have soft drinks and coffee.\"",
+    "fullList": "\"I'm sorry, we don't have white wine today. We have whiskey, beer, red wine, soft drinks, and coffee.\"",
+    "itemQuestion": "white wine",
+    "itemCompetitor": "red wine",
+    "itemSameCat1": "beer",
+    "itemOtherCat1": "soft drinks",
+    "itemOtherCat2": "coffee"
+  },
+  "bar-coffee": {
+    "settingName": "bar",
+    "vignette": "You are a bar tender in a hotel bar. The bar serves only coffee, beer, red wine, soft drinks and soda today.\\n\\nLate at night a woman walks in. She looks gloomy. She says: \"Do you have tea?\"\\n\\nYou reply:",
+    "taciturn": "\"I'm sorry, we don't have tea today.\"",
+    "competitor": "\"I'm sorry, we don't have tea today. We have coffee.\"",
+    "sameCategory": "\"I'm sorry, we don't have tea today. We have coffee, soft drinks, and soda.\"",
+    "otherCategory": "\"I'm sorry, we don't have tea today. We have beer and red wine.\"",
+    "fullList": "\"I'm sorry, we don't have tea today. We have coffee, beer, red wine, soft drinks, and soda.\"",
+    "itemQuestion": "tea",
+    "itemCompetitor": "coffee",
+    "itemSameCat1": "soda",
+    "itemOtherCat1": "beer",
+    "itemOtherCat2": "red wine"
+  },
+  "airport-europe": {
+    "settingName": "airport",
+    "vignette": "You are a customer service agent helping book flights. Today there is a morning flight to Berlin, an afternoon flight to Madrid, an evening flight to Paris, and several flights to the US.\\n\\nA customer asks: \"Do you have a morning flight to Madrid?\"\\n\\nYou reply:",
+    "taciturn": "\"I'm sorry, we don't have a morning flight to Madrid.\"",
+    "competitor": "\"I'm sorry, we don't have a morning flight to Madrid today, but we have one in the afternoon.\"",
+    "sameCategory": "\"\"I'm sorry, we don't have a morning flight to Madrid today. We have a morning flight to Berlin, an afternoon flight to Madrid, and an evening flight to Paris.\"",
+    "otherCategory": "\"\"I'm sorry, we don't have a morning flight to Madrid today, but we have several flights to the US.\"",
+    "fullList": "\"\"I'm sorry, we don't have a morning flight to Madrid today, but we have a morning flight to Berlin, an afternoon flight to Madrid, an evening flight to Paris, and several flights to the US.\"",
+    "itemQuestion": "madrid morning",
+    "itemCompetitor": "madrid afternoon",
+    "itemSameCat1": "paris evening",
+    "itemOtherCat1": "united states 1",
+    "itemOtherCat2": "united states 2"
+  }
+}
