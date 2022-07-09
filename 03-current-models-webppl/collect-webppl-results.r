@@ -4,7 +4,17 @@ library(aida)    # remotes::install_github("michael-franke/aida-package")
 
 
 run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_name = "R1Posterior_BinaryPrefs", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
-  webPPL_data = tibble('task' = task_name)
+  webPPL_data = tibble(
+    'task' = task_name,
+    'R0Alpha'          = 9.0001,
+    'policyAlpha'      = 9.5,
+    'qquestionerAlpha' = 9,
+    'R1Alpha'          = 9,
+    'relevanceBetaR0'  = 9,
+    'relevanceBetaR1'  = 9.95,
+    'costWeight'       = 9.45,
+    'questionCost'     = 9.25
+  )
   webppl(
     program_file = model_file_name,
     data = webPPL_data,
@@ -48,6 +58,8 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
   ggsave(filename = paste0("pics/results-", task_name, file_name_addition, ".pdf"), width = 16/factor, height = 9/factor)
 
 }
+
+run_plot_model(task_name = "TSO")
 
 run_plot_model(task_name = "safeAnswererPositive")
 run_plot_model(task_name = "safeAnswererNegative")
@@ -116,4 +128,3 @@ prior_samples %>%
   
 factor = 3
 ggsave(filename = paste0("pics/results-", "continuousInference-prior", ".pdf"), width = 9/factor, height = 6/factor)
-  

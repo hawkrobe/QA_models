@@ -88,20 +88,6 @@ var replaceEmptyListWithStringNothing = function(set) {
   ), "nothing");
 }
 
-//  -------------------
-// | global parameters |
-//  -------------------
-
-var params = {
-  R0Alpha         : 0.0001,
-  policyAlpha     : 2.5,
-  questionerAlpha : 4,
-  R1Alpha         : 3,
-  relevanceBetaR0 : 0,     // beta=1 for only action-utility
-  relevanceBetaR1 : 0.95,   //
-  costWeight      : 0.45,
-  questionCost    : 0.25    // cost for a question (relative to no question)
-};
 
 //  -----------------------------------------------
 // | helper functions for preparing context models |
@@ -543,7 +529,7 @@ var pieCakeContextBiasedPessimist = extend(
 )
 
 // response cost is proportional to length in words
-var cost = function(response) {
+var cost = function(response,params) {
   return _.includes(response, "---") ? 0 : params.costWeight * (response.split('+').length);
 };
 
@@ -625,7 +611,7 @@ var tsoContext = {
 
 // soft-max choice for EU given beliefs and utils in DP
 // yields the 'action policy' of the decision maker
-var getActionPolicy = function(beliefs, context) {
+var getActionPolicy = function(beliefs, context, params) {
   return Infer({method: 'enumerate'}, function() {
     var action = uniformDraw(context.actions);
     var decisionProblem = context.decisionProblem;
@@ -667,34 +653,34 @@ var updateBeliefs = function(beliefs, question, response, context) {
 
 // utility of a question is equal to the expected _value_ of the
 // DP after receiving a response; _value_ depends on DM's action policy
-var questionUtility = function(utterance, beliefs, context) {
+var questionUtility = function(utterance, beliefs, context, params) {
   // questioner wants to *maximize* expected payoff under decision problem
   var decisionProblem = context.decisionProblem;
-  var actionPolicy = getActionPolicy(beliefs, context);
+  var actionPolicy = getActionPolicy(beliefs, context, params);
   var actionUtility = expectation(actionPolicy, function(action) {
     // weight possible actions proportional to reward
     return expectation(beliefs, function(world) {
       return decisionProblem(world, action);
     });
   });
-  return actionUtility - cost(utterance);
+  return actionUtility - cost(utterance, params);
 };
 
 // responder wants to bring questioner's beliefs and/or action policy
 // as close to their own as possible
-var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta) {
+var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta, params) {
   // respondent wants to *minimize* KL b/w beliefs (bringing closer to own belief)
   var epistemicUtility = -KL(beliefs1, beliefs2);
-  var actionUtility = -KL(getActionPolicy(beliefs1, context),
-                          getActionPolicy(beliefs2, context));
+  var actionUtility = -KL(getActionPolicy(beliefs1, context, params),
+                          getActionPolicy(beliefs2, context, params));
   return ((1 - relevanceBeta) * epistemicUtility
           + relevanceBeta * actionUtility
-          - cost(utterance));
+          - cost(utterance, params));
 };
 
 // base-level respondent chooses any safe and true answer
 // with equal probability
-var R0 = cache(function(question, context) {
+var R0 = cache(function(question, context, params) {
   var getLicensedResponsesR0 = context.getLicensedResponsesR0;
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(getLicensedResponsesR0(question));
@@ -702,13 +688,13 @@ var R0 = cache(function(question, context) {
     var ownBeliefs = context.R0PriorOverWorlds;
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
     //     console.log('updated beliefs', otherBeliefs);
-    factor(params.R0Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR0));
+    factor(params.R0Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR0, params));
     return response;
   });
 });
 
 // dummy R0 with response set of R1
-var R1ContextFree = cache(function(question, context) {
+var R1ContextFree = cache(function(question, context, params) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
@@ -719,20 +705,20 @@ var R1ContextFree = cache(function(question, context) {
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
     // console.log('updated beliefs: ');
     // terminalViz(otherBeliefs, 4);
-    factor(10 * (-KL(ownBeliefs, otherBeliefs) - cost(response)));
+    factor(10 * (-KL(ownBeliefs, otherBeliefs) - cost(response, params)));
     return response;
   });
 });
 
 // gives updated beliefs about world state after hearing response to question
 // based on a pragmatic interpretation of the response (as emitted by R0)
-var updateBeliefsPragmatic = function(beliefs, question, response, context) {
+var updateBeliefsPragmatic = function(beliefs, question, response, context, params) {
   var meaning = context.meaning;
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
     var pragmaticResponse = R0(question, extend(context, {
       R0PriorOverWorlds: Delta({v: world})
-    }));
+    }), params);
     observe(pragmaticResponse,response)
     return world;
   });
@@ -740,13 +726,13 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context) {
 
 // gives updated beliefs about world state after hearing response to question
 // based on a pragmatic interpretation (as emitted by R0 w/ full answer set of R1)
-var updateBeliefsPragmaticR1 = function(beliefs, question, response, context) {
+var updateBeliefsPragmaticR1 = function(beliefs, question, response, context, params) {
   var meaning = context.meaning;
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
     var pragmaticResponse = R1ContextFree(question, extend(context, {
       R0PriorOverWorlds: Delta({v: world})
-    }));
+    }), params);
     observe(pragmaticResponse,response)
     return world;
   });
@@ -754,7 +740,7 @@ var updateBeliefsPragmaticR1 = function(beliefs, question, response, context) {
 
 // Q1 selects a question with prob proportional to the expected
 // value of the DP after hearing a response
-var Q1 = function(context) {
+var Q1 = function(context, params) {
   return Infer({method: 'enumerate'}, function(){
     var question = uniformDraw(context.questions);
     // console.log('considering question', question.queried);
@@ -762,13 +748,13 @@ var Q1 = function(context) {
       // console.log('in possible world', trueWorld);
       var possibleResponses = R0(question, extend(context, {
         R0PriorOverWorlds: Delta({v: trueWorld})
-      }))
+      }), params)
       // console.log('respondent: ', possibleResponses)
       return expectation(possibleResponses, function(response) {
         // console.log('considering response ', response );
         var currBeliefs = context.questionerBeliefs;
-        var updatedBeliefs = updateBeliefsPragmatic(currBeliefs, question, response, context);
-        return questionUtility(response, updatedBeliefs, context);
+        var updatedBeliefs = updateBeliefsPragmatic(currBeliefs, question, response, context, params);
+        return questionUtility(response, updatedBeliefs, context, params);
       });
     });
     //     console.log('expected utility: ',expectedUtility)
@@ -813,7 +799,7 @@ var R1PriorContext_BinaryPrefs = {
   distribution: Categorical({vs: ["raspberry" , "lemon"]})
 }
 
-var R1ContextPosterior = cache(function(context, question, R1PriorContext) {
+var R1ContextPosterior = cache(function(context, question, R1PriorContext, params) {
   Infer(
     {method:'enumerate'},
     function() {
@@ -821,7 +807,7 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext) {
       var context_sample = extend(
         R1PriorContext[context_label],
         {R1PriorOverWorlds: context.R1PriorOverWorlds});
-      var questioner = Q1(context_sample);
+      var questioner = Q1(context_sample, params);
       // console.log("considering context: ", context_label);
       // console.log("prob of question ", question.text, ": ", questioner.score(question.text));
       factor(questioner.score(question.text));
@@ -831,7 +817,7 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext) {
 })
 
 // R1Sampler is a sampling-based non-normative agent
-var R1Sampler = cache(function(context, R1PriorContext, question) {
+var R1Sampler = cache(function(context, R1PriorContext, question, params) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
@@ -840,35 +826,35 @@ var R1Sampler = cache(function(context, R1PriorContext, question) {
     var context_sample = extend(
       R1PriorContext[context_label],
       {R1PriorOverWorlds: context.R1PriorOverWorlds});
-    var questioner = Q1(context_sample);
+    var questioner = Q1(context_sample, params);
     factor(questioner.score(question.text));
     var response = uniformDraw(responses);
     var ownBeliefs = context.R1PriorOverWorlds;
     var otherBeliefs = updateBeliefs(context_sample.questionerBeliefs, question, response, context_sample);
-    var utility = answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1);
+    var utility = answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1, params);
     factor(params.R1Alpha * utility);
     return {context_label, response};
   });
 });
 
 // R1 Averager is full rational reasoner, it's what we use preferably
-var R1Averager = cache(function(context, R1PriorContext, question) {
+var R1Averager = cache(function(context, R1PriorContext, question, params) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
   var ownBeliefs = context.R1PriorOverWorlds;
-  var contextPosterior = marginalize(R1ContextPosterior(context, question, R1PriorContext), 'sample');
+  var contextPosterior = marginalize(R1ContextPosterior(context, question, R1PriorContext, params), 'sample');
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
     // console.log("considering response: ", response)
     var expectedUtility = expectation(
       contextPosterior,
       function(context_sample) {
-        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs, question, response, context_sample);
+        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs, question, response, context_sample, params);
         // console.log("updated beliefs after response: ", response)
         // terminalViz(otherBeliefs, 4)
         var decisionProblem = context_sample.decisionProblem;
-        var actionPolicy = getActionPolicy(otherBeliefs, context);
+        var actionPolicy = getActionPolicy(otherBeliefs, context, params);
         var actionUtility = expectation(actionPolicy, function(action) {
           // weight possible actions proportional to reward
           return expectation(otherBeliefs, function(world) {
@@ -877,9 +863,9 @@ var R1Averager = cache(function(context, R1PriorContext, question) {
         });
         var EU = ((1-params.relevanceBetaR1) * -KL(ownBeliefs, otherBeliefs) +
                   params.relevanceBetaR1 * actionUtility -
-                  cost(response))
+                  cost(response,params))
         return (EU)
-        // return answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1)
+        // return answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1, params)
       }
     )
     factor(params.R1Alpha * expectedUtility);
@@ -891,7 +877,7 @@ var R1Averager = cache(function(context, R1PriorContext, question) {
 // testing & debugging w/ terminal
 //////////////////////////////////////////////////
 
-var consoleOut = function() {
+var consoleOut = function(params) {
 
   var context = pieCakeContextAdditivePreferences;
   // var context = pieCakeContextUnbiasedNoPref;
@@ -938,12 +924,12 @@ var consoleOut = function() {
   var meaning = context.meaning
   console.log('truth R1 r.: \t', meaning(world,question,responseR1));
 
-  var R0_test = R0(question, context_extended)
+  var R0_test = R0(question, context_extended, params)
 
   console.log("R0:")
   terminalViz(R0_test, 4)
 
-  var R0Ext_test = R1ContextFree(question, context_extended)
+  var R0Ext_test = R1ContextFree(question, context_extended, params)
 
   console.log("R0 (extended):")
   terminalViz(R0Ext_test, 4)
@@ -953,28 +939,28 @@ var consoleOut = function() {
   // -------------------------------------
 
   // belief inference
-  var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1);
+  var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1, params);
   console.log("Posterior inference (uncertainty about beliefs)")
   terminalViz(marginalize(R1posteriorContextBeliefs, 'label'),4)
 
-  var R1SamplerBeliefInference  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question), 'response')
+  var R1SamplerBeliefInference  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question, params), 'response')
   console.log("R1-Sampler (uncertainty about beliefs):")
   terminalViz(R1SamplerBeliefInference,4)
 
-  var R1AveragerBeliefInference = R1Averager(context_extended, R1PriorContext_beliefsQ1, question)
+  var R1AveragerBeliefInference = R1Averager(context_extended, R1PriorContext_beliefsQ1, question, params)
   console.log("R1-Averager (uncertainty about beliefs):")
   terminalViz(R1AveragerBeliefInference,4)
 
   // preference inference
-  var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1);
+  var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1, params);
   console.log("Posterior inference (uncertainty about preferences)")
   terminalViz(marginalize(R1posteriorContextPreference, 'label'),4)
 
-  var R1SamplerPreferenceInference  = marginalize(R1Sampler(context_extended, R1PriorContext_PreferenceQ1, question), 'response')
+  var R1SamplerPreferenceInference  = marginalize(R1Sampler(context_extended, R1PriorContext_PreferenceQ1, question, params), 'response')
   console.log("R1-Sampler (uncertainty about preferences):")
   terminalViz(R1SamplerPreferenceInference,4)
 
-  var R1AveragerPreferenceInference = R1Averager(context_extended, R1PriorContext_PreferenceQ1, question)
+  var R1AveragerPreferenceInference = R1Averager(context_extended, R1PriorContext_PreferenceQ1, question, params)
   console.log("R1-Averager (uncertainty about preferences):")
   terminalViz(R1AveragerPreferenceInference,4)
 
@@ -983,14 +969,16 @@ var consoleOut = function() {
   var R1posteriorContextPreferenceBinaryQRP = R1ContextPosterior(
     pieCakeContextUnbiasedNoPref,
     context.questions[2],
-    R1PriorContext_BinaryPrefs);
+    R1PriorContext_BinaryPrefs,
+    params);
   console.log("Posterior inference (binary after RP?)")
   terminalViz(marginalize(R1posteriorContextPreferenceBinaryQRP, 'label'),4)
 
   var R1AveragerPreferenceInferenceBinaryQRP = R1Averager(
     context_extended,
     R1PriorContext_BinaryPrefs,
-    context.questions[2])
+    context.questions[2],
+    params)
   console.log("R1-Averager (binary preferences & 'RP?'):")
   terminalViz(R1AveragerPreferenceInferenceBinaryQRP,4)
 
@@ -1001,8 +989,8 @@ var consoleOut = function() {
 // visualization in the browser
 //////////////////////////////////////////////////
 
-// viz(R0(question, context_extended));
-// viz(Q1(context));
+// viz(R0(question, context_extended, params));
+// viz(Q1(context, params));
 // viz(R1Sampler);
 // viz(R1Averager);
 
@@ -1014,6 +1002,25 @@ var consoleOut = function() {
 var makeR = function(){
 
   console.log("Starting task: ", RInput[0].task, RInput[0].task == "safeAnswererPositive")
+
+  if (RInput[0].task == "TSO") {
+    // target-same-other setting (1st pilot)
+    console.log('before: ', params)
+    extend(
+      params,
+      {
+        R0Alpha         : RInput[0].R0Alpha,
+        policyAlpha     : RInput[0].policyAlpha,
+        questionerAlpha : RInput[0].questionerAlpha,
+        R1Alpha         : RInput[0].R1Alpha,
+        relevanceBetaR0 : RInput[0].relevanceBetaR0,  // beta=1 for only action-utility
+        relevanceBetaR1 : RInput[0].relevanceBetaR1,   //
+        costWeight      : RInput[0].costWeight,
+        questionCost    : RInput[0].questionCost      // cost for a question (relative to no question)
+      }
+    )
+    console.log('after: ', params)
+  }
 
   if (RInput[0].task == "continuousInference") {
     // two-parameter continuous inference of preferences
@@ -1034,7 +1041,7 @@ var makeR = function(){
       R0PriorOverWorlds: Delta({v: world}),
       R1PriorOverWorlds: Delta({v: world}),
     });
-    var R0test = R0( question,  context_extended )
+    var R0test = R0( question,  context_extended, params )
     terminalViz(R0test)
     return R0test
   }
@@ -1051,7 +1058,7 @@ var makeR = function(){
       R0PriorOverWorlds: Delta({v: world}),
       R1PriorOverWorlds: Delta({v: world}),
     });
-    var R0test = R0( question,  context_extended )
+    var R0test = R0( question,  context_extended, params )
     terminalViz(R0test)
     return R0test
   }
@@ -1068,7 +1075,8 @@ var makeR = function(){
     return R1Averager(
       context_extended,
       R1PriorContext_BinaryPrefs,
-      question)
+      question,
+      params)
   }
   if (RInput[0].task == "R1Posterior_BinaryPrefs") {
     // R1 posterior over contexts for binary preference inference
@@ -1082,7 +1090,8 @@ var makeR = function(){
     return marginalize(R1ContextPosterior(
       context,
       question,
-      R1PriorContext_BinaryPrefs
+      R1PriorContext_BinaryPrefs,
+      params
     ), 'label');
   }
   else {
@@ -1095,7 +1104,7 @@ var makeR = function(){
     RInput[0].task == 'pieCakeContextUnbiasedNoPref' ? pieCakeContextUnbiasedNoPref :
     RInput[0].task == 'pieCakeContextBiasedPessimist' ? pieCakeContextBiasedPessimist :
         false
-    Q1(context)
+    Q1(context, params)
   }
 }
 
@@ -1123,13 +1132,13 @@ var makeContext = function(RP, LC) {
     });
 }
 
-var getContInf = function(){
+var getContInf = function(params){
 
   var getScore = function(RP, LC) {
     // build context with parameters
     var c =  makeContext(RP, LC);
     // questioner choice & score
-    var questioner = Q1(c)
+    var questioner = Q1(c, params)
     var score = questioner.score('RP?')
     return(score)
   }
@@ -1151,16 +1160,16 @@ var getContInf = function(){
 
 }
 
-var continuousInference = function(){
-  var cI = getContInf()
+var continuousInference = function(params){
+  var cI = getContInf(params)
   viz(cI)
   viz(marginalize(cI, "RP"))
   viz(marginalize(cI, "LC"))
 }
 
-var consoleOutQ1ContInf = function(RP, LC) {
+var consoleOutQ1ContInf = function(RP, LC, params) {
   console.log('question probs with: RP =', RP, 'LC =', LC)
-  terminalViz(Q1(makeContext(RP,LC)))
+  terminalViz(Q1(makeContext(RP,LC), params))
 }
 
 
@@ -1168,7 +1177,7 @@ var consoleOutQ1ContInf = function(RP, LC) {
 // dev corner
 ////////////////////////////////////////////////////////////////////////////
 
-var devFun = function() {
+var consoleOutTSO = function(params) {
 
   var context = tsoContext;
   console.log('context: \t', context.name);
@@ -1209,12 +1218,12 @@ var devFun = function() {
   var meaning = context.meaning
   console.log('truth R1 r.: \t', meaning(world,question,responseR1));
 
-  var R0_test = R0(question, context)
+  var R0_test = R0(question, context, params)
 
   console.log("R0:")
   terminalViz(R0_test, 4)
 
-  // var R0Ext_test = R1ContextFree(question, context)
+  // var R0Ext_test = R1ContextFree(question, context, params)
   // console.log("R0 (extended):")
   // terminalViz(R0Ext_test, 4)
 
@@ -1228,60 +1237,13 @@ var devFun = function() {
     distribution: Categorical({vs: ["trueWorld"]})
   }
 
-  var R1posterior = R1ContextPosterior(tsoContext, question, R1Prior_FullKnowledge);
+  var R1posterior = R1ContextPosterior(tsoContext, question, R1Prior_FullKnowledge, params);
   console.log("Posterior inference (trivial)")
   terminalViz(marginalize(R1posterior, 'label'),4)
 
-  var R1Prediction = R1Averager(tsoContext, R1Prior_FullKnowledge, question)
+  var R1Prediction = R1Averager(tsoContext, R1Prior_FullKnowledge, question, params)
   console.log("R1-Averager (full knowledge):")
   terminalViz(R1Prediction,4)
-
-  // -------------------------------------
-  // testing belief & preference inference
-  // -------------------------------------
-
-
-  // // belief inference
-  // var R1posteriorContextBeliefs = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_beliefsQ1);
-  // console.log("Posterior inference (uncertainty about beliefs)")
-  // terminalViz(marginalize(R1posteriorContextBeliefs, 'label'),4)
-
-  // var R1SamplerBeliefInference  = marginalize(R1Sampler(context_extended, R1PriorContext_beliefsQ1, question), 'response')
-  // console.log("R1-Sampler (uncertainty about beliefs):")
-  // terminalViz(R1SamplerBeliefInference,4)
-
-  // var R1AveragerBeliefInference = R1Averager(context_extended, R1PriorContext_beliefsQ1, question)
-  // console.log("R1-Averager (uncertainty about beliefs):")
-  // terminalViz(R1AveragerBeliefInference,4)
-
-  // // preference inference
-  // var R1posteriorContextPreference = R1ContextPosterior(pieCakeContextUnbiasedNoPref, question, R1PriorContext_PreferenceQ1);
-  // console.log("Posterior inference (uncertainty about preferences)")
-  // terminalViz(marginalize(R1posteriorContextPreference, 'label'),4)
-
-  // var R1SamplerPreferenceInference  = marginalize(R1Sampler(context_extended, R1PriorContext_PreferenceQ1, question), 'response')
-  // console.log("R1-Sampler (uncertainty about preferences):")
-  // terminalViz(R1SamplerPreferenceInference,4)
-
-  // var R1AveragerPreferenceInference = R1Averager(context_extended, R1PriorContext_PreferenceQ1, question)
-  // console.log("R1-Averager (uncertainty about preferences):")
-  // terminalViz(R1AveragerPreferenceInference,4)
-
-  // // binary preference inference
-
-  // var R1posteriorContextPreferenceBinaryQRP = R1ContextPosterior(
-  //   pieCakeContextUnbiasedNoPref,
-  //   context.questions[2],
-  //   R1PriorContext_BinaryPrefs);
-  // console.log("Posterior inference (binary after RP?)")
-  // terminalViz(marginalize(R1posteriorContextPreferenceBinaryQRP, 'label'),4)
-
-  // var R1AveragerPreferenceInferenceBinaryQRP = R1Averager(
-  //   context_extended,
-  //   R1PriorContext_BinaryPrefs,
-  //   context.questions[2])
-  // console.log("R1-Averager (binary preferences & 'RP?'):")
-  // terminalViz(R1AveragerPreferenceInferenceBinaryQRP,4)
 
 }
 
@@ -1292,14 +1254,30 @@ var devFun = function() {
 // consoleOut          : use w/ terminal for dev
 // continuousInference : use in webppl.org (plotting) of contin. Inference
 // consoleOutQ1Cont    : use w/ terminal for dev Q1 beh. in cont. Inference
+// consoleOutTSO       : use w/ terminal for dev of TSO case (1st pilot)
 // /////////////////////////////////////////////////////////////////////////
+
+//  -------------------
+// | global parameters |
+//  -------------------
+
+var paramsGlobal = {
+  R0Alpha         : 0.0001,
+  policyAlpha     : 2.5,
+  questionerAlpha : 4,
+  R1Alpha         : 3,
+  relevanceBetaR0 : 0,     // beta=1 for only action-utility
+  relevanceBetaR1 : 0.95,   //
+  costWeight      : 0.45,
+  questionCost    : 0.25    // cost for a question (relative to no question)
+};
 
 
 // makeR()
-// consoleOut()
-// continuousInference()
-// consoleOutQ1ContInf(5,-1)
+// consoleOut(paramsGlobal)
+// continuousInference(paramsGlobal)
+// consoleOutQ1ContInf(5,-1, paramsGlobal)
 
-devFun(); // compare against pilot data from N=50
+consoleOutTSO(paramsGlobal); // compare against pilot data from N=50
           // frequency of answer types:
           // 0.1267 0.5698 0.2068 0.0000 0.0967
