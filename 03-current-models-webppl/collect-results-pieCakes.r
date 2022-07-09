@@ -4,6 +4,26 @@ library(mvtnorm)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 
 
+##################################################
+
+# these options help Stan run faster
+options(mc.cores = parallel::detectCores())
+
+# use the aida-theme for plotting
+theme_set(theme_aida())
+
+# global color scheme / non-optimized
+project_colors = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
+
+# setting theme colors globally
+scale_colour_discrete <- function(...) {
+  scale_colour_manual(..., values = project_colors)
+}
+scale_fill_discrete <- function(...) {
+  scale_fill_manual(..., values = project_colors)
+} 
+
+##################################################
 
 run_model_tso <- function (params, utils) {
   
@@ -40,12 +60,12 @@ utils <- tibble(
 
 priorSampleParams <- function() {
   params <- tibble(
-    'R0Alpha'          = runif(1,min = 0.00005, max = 0.0001),
-    'policyAlpha'      = runif(1,min = 2, max = 3),
-    'questionerAlpha'  = runif(1,min = 3.5, max = 4.5),
-    'R1Alpha'          = runif(1,min = 2.5, max = 3.5),
+    'R0Alpha'          = 0.0001,
+    'policyAlpha'      = runif(1,min = 2.25, max = 2.75),
+    'questionerAlpha'  = runif(1,min = 3.75, max = 4.25),
+    'R1Alpha'          = runif(1,min = 2.75, max = 3.25),
     'relevanceBetaR0'  = 0,
-    'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.975),
+    'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97),
     'costWeight'       = runif(1,min = 0.4, max = 0.5),
     'questionCost'     = runif(1,min = 0.2, max = 0.3)
   )
@@ -71,7 +91,8 @@ priorSampleUtils <- function() {
 
 n_samples = 1000
 
-priorPred <- map_df(1:3, function(i) {
+
+priorPred <- map_df(1:n_samples, function(i) {
   message('run ', i)
   params <- priorSampleParams()
   utils  <- priorSampleUtils()
@@ -82,7 +103,30 @@ priorPred <- map_df(1:3, function(i) {
   return (out)
 })
 
-priorPred %>% 
+priorPredSummary <- priorPred %>% 
   group_by(support) %>% 
-  tidyboot::tidyboot_mean(prob)
+  do(aida::summarize_sample_vector(.$prob)) %>% 
+  select(-Parameter)
+
+write_csv(priorPred, 'priorPred.csv')
+
+answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'exhaustive', 'unclassified')
+
+priorPredSummary %>% 
+  mutate(
+    answerType = case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat1+otherCat2" ~ 'exhaustive',
+      support == "no.otherCat1+otherCat2" ~ 'other category'
+    ) %>% factor(levels = answerOrder)
+  ) %>% 
+  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
+  theme(legend.position = 'none') +
+  xlab('answer type') +
+  ylab('mean prior predictive')
+
 
