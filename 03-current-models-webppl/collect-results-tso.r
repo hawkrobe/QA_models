@@ -6,14 +6,14 @@ library(aida)    # remotes::install_github("michael-franke/aida-package")
 run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_name = "R1Posterior_BinaryPrefs", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
   webPPL_data = tibble(
     'task' = task_name,
-    'R0Alpha'          = 9.0001,
-    'policyAlpha'      = 9.5,
-    'qquestionerAlpha' = 9,
-    'R1Alpha'          = 9,
-    'relevanceBetaR0'  = 9,
-    'relevanceBetaR1'  = 9.95,
-    'costWeight'       = 9.45,
-    'questionCost'     = 9.25
+    'R0Alpha'          = 0.0001,
+    'policyAlpha'      = 2.5,
+    'qquestionerAlpha' = 4,
+    'R1Alpha'          = 3,
+    'relevanceBetaR0'  = 0,
+    'relevanceBetaR1'  = 0.95,
+    'costWeight'       = 0.45,
+    'questionCost'     = 0.25
   )
   webppl(
     program_file = model_file_name,
@@ -59,7 +59,34 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
 
 }
 
-run_plot_model(task_name = "TSO")
+run_model_tso <- function (model_file_name = "qa-models-current.webppl", task_name = "TSO", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
+  webPPL_data = tibble(
+    'task'             = task_name,
+    'R0Alpha'          = 0.0001,
+    'policyAlpha'      = 2.5,
+    'questionerAlpha'  = 4,
+    'R1Alpha'          = 3,
+    'relevanceBetaR0'  = 0,
+    'relevanceBetaR1'  = 0.95,
+    'costWeight'       = 0.45,
+    'questionCost'     = 0.25,
+    'utilTarget'       = 7,
+    'utilCompetitor'   = 6,
+    'utilSameCat'      = 4,
+    'utilOtherCat'     = 1
+  )
+  webppl(
+    program_file = model_file_name,
+    data = webPPL_data,
+    data_var = "RInput"
+  ) -> output
+  return(output)
+}
+
+run_model_tso()
+
+
+
 
 run_plot_model(task_name = "safeAnswererPositive")
 run_plot_model(task_name = "safeAnswererNegative")
