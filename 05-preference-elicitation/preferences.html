@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.1"></script>
     <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.1"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.1"></script>
+    <script src="/socket.io/socket.io.js" type="text/javascript"></script>
 
     <link href="https://unpkg.com/jspsych@7.2.3/css/jspsych.css"
           rel="stylesheet"
@@ -16,14 +17,24 @@
   <body></body>
   <script>
     /* initialize jsPsych */
+    var socket = io.connect();
     var jsPsych = initJsPsych({
-        on_finish: function() {
-            var xhr = new XMLHttpRequest();
-            var data = jsPsych.data.get().json()
-            xhr.open("POST", "./save_data.php");
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.send(JSON.stringify({ filename: name, filedata: data }));
-        }
+      on_finish : function(data) {
+        window.location.replace("https://app.prolific.co/submissions/complete?cc=7DBB9B97")
+      },
+      on_trial_finish: function(trialData) {
+	const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+	var packet = Object.assign({}, trialData, {
+          dbname: 'QA',
+          colname: 'preferences',
+          wID: urlParams.get('PROLIFIC_PID'),
+          aID: urlParams.get('STUDY_ID'),
+          hitID: urlParams.get('SESSION_ID'),
+          iterationName: 'pilot'
+        })
+        socket.emit('currentData', packet);
+      }
     });
 
     /* create timeline */
@@ -83,8 +94,7 @@
         },
         prompt: "",
         labels: ['makes it much less likely', "doesn't tell me anything", "makes it much more likely"],
-        force_wait: 10000,
-        require_movement: false,
+        require_movement: true,
         data: {
             scenario: jsPsych.timelineVariable('scenario'),
             comparison: jsPsych.timelineVariable('comparison'),
@@ -101,7 +111,8 @@
                 <p>Press any key to submit the task and receive compensation!</p>
                 <p>After you exit, it is safe to close the screen. Your responses will be saved automatically.</p>
               `;
-          }
+          },
+	choices: ['Submit']
       };
 
     /* define test procedure */
