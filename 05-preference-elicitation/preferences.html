@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.1"></script>
     <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.1"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.1"></script>
-    <script src="stimuli.js"></script>
 
     <link href="https://unpkg.com/jspsych@7.2.3/css/jspsych.css"
           rel="stylesheet"
@@ -19,7 +18,11 @@
     /* initialize jsPsych */
     var jsPsych = initJsPsych({
         on_finish: function() {
-            jsPsych.data.displayData();
+            var xhr = new XMLHttpRequest();
+            var data = jsPsych.data.get().json()
+            xhr.open("POST", "./save_data.php");
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send(JSON.stringify({ filename: name, filedata: data }));
         }
     });
 
@@ -89,6 +92,18 @@
             stimulus_type: 'question'
         }
     };
+
+      var debrief_block = {
+          type: jsPsychHtmlButtonResponse,
+          stimulus: function () {
+              return `
+                <p>Thanks for participating in the experiment!</p>
+                <p>Press any key to submit the task and receive compensation!</p>
+                <p>After you exit, it is safe to close the screen. Your responses will be saved automatically.</p>
+              `;
+          }
+      };
+
     /* define test procedure */
     var main = {
       timeline: [question_trial],
@@ -102,7 +117,8 @@
       randomize_order: true
     };
       timeline.push(welcome)
-    timeline.push(main); 
+      timeline.push(main);
+      timeline.push(debrief_block); 
     jsPsych.run(timeline);
     </script>
 
