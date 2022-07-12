@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My experiment</title>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.10/lodash.min.js"></script>
+    <script src="https://unpkg.com/jspsych@7.2.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.1"></script>
+    <script src="stimuli.js"></script>
+
+    <link href="https://unpkg.com/jspsych@7.2.3/css/jspsych.css"
+          rel="stylesheet"
+          type="text/css" />
+  </head>
+  <body></body>
+  <script>
+    /* initialize jsPsych */
+    var jsPsych = initJsPsych({
+        on_finish: function() {
+            jsPsych.data.displayData();
+        }
+    });
+
+    /* create timeline */
+    var timeline = [];
+
+    var welcome = {
+        type: 'html-keyboard-response',
+        stimulus: 'Thank you for participating. Press any key to begin.'
+    }
+    
+    var question_trial = {
+        type: jsPsychSurveyText,
+        preamble: function() {
+            var text = jsPsych.timelineVariable('vignette').replace(
+                /\\n\\n/g, '</p><br><p style="width:600px;text-align:left;margin:auto">'
+            );
+            console.log(text)
+            return '<p style="width:600px;text-align:left;margin:auto">' + text + '</p>'  
+        } ,
+        questions: [
+            {prompt: ""}
+        ],
+        force_wait: 10000,
+        data: {
+            stimulus_type: 'speakerSurvey'
+        }
+    };
+    /* define test procedure */
+    var main = {
+      timeline: [question_trial],
+      timeline_variables: _.values(stimuli),
+      randomize_order: true
+    };
+    timeline.push(main); 
+    jsPsych.run(timeline);
+    </script>
+
+      
+</html>

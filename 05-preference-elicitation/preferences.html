@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My experiment</title>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.10/lodash.min.js"></script>
+    <script src="https://unpkg.com/jspsych@7.2.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-slider-response@1.1.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.1"></script>
+    <script src="/socket.io/socket.io.js" type="text/javascript"></script>
+
+    <link href="https://unpkg.com/jspsych@7.2.3/css/jspsych.css"
+          rel="stylesheet"
+          type="text/css" />
+  </head>
+  <body></body>
+  <script>
+    /* initialize jsPsych */
+    var socket = io.connect();
+    var jsPsych = initJsPsych({
+      on_finish : function(data) {
+        window.location.replace("https://app.prolific.co/submissions/complete?cc=7DBB9B97")
+      },
+      on_trial_finish: function(trialData) {
+	const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+	var packet = Object.assign({}, trialData, {
+          dbname: 'QA',
+          colname: 'preferences',
+          wID: urlParams.get('PROLIFIC_PID'),
+          aID: urlParams.get('STUDY_ID'),
+          hitID: urlParams.get('SESSION_ID'),
+          iterationName: 'pilot'
+        })
+        socket.emit('currentData', packet);
+      }
+    });
+
+    /* create timeline */
+    var timeline = [];
+    var stimuli = {
+        'Suppose you learn someone likes <b>raspberry cake</b>.':	['like raspberry pie','like lemon cake','like chocolate cookies','like pasta al forno','like cheese sandwiches'],
+        'Suppose you learn someone likes <b>pasta arrabiata</b>.': ['like pasta al forno', 'like pizza', 'like lasagna', 'like lemon cake', 'like chocolate cookies'],
+        'Suppose you learn someone likes <b>drinking white wine</b>.': ['like red wine', 'like whiskey', 'like beer', 'like soft drinks', 'like coffee'],
+        'Suppose you learn someone likes <b>drinking tea</b>.': ['like coffee', 'like soft drinks', 'like soda', 'like beer', 'like red wine'],
+        'Suppose you learn someone wants to take a <b>morning flight to Madrid</b>.': ['want an afternoon flight to Madrid', 'want a morning flight to Berlin', 'want an evening flight to Paris', 'want a morning flight to the United States', 'want an evening flight to the United States'],
+        'Suppose you learn someone wants to take an <b>afternoon flight to Boston</b>.': ['want a morning flight to Boston', 'want an afternoon flight to San Francisco', 'want an evening flight to Los Angeles', 'want a morning flight to Europe', 'want an afternoon flight to Europe'],
+        'Suppose you learn someone likes watching <b>cartoons</b>.': ['like animated films', 'like comedies', 'like musicals', 'like horror movies', 'like thrillers'],
+        'Suppose you learn someone likes watching <b>fantasy movies</b>.': ['like science fiction movies', 'like adventure movies', 'like film noirs', 'like cartoons', 'like animation films'],
+        'Suppose you learn someone likes listening to <b>hard rock</b>.': ['like classic rock', 'like heavy metal', 'like power metal', 'like bebop jazz', 'like dixieland'],
+        'Suppose you learn someone likes listening to <b>bebop jazz</b>': ['like hard bop jazz', 'like cool jazz', 'like soul jazz', 'like death metal', 'like doom metal']
+    }
+
+    var consent = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus:
+        "<font size='2'><p align='left'>This research is being conducted by Robert Hawkins, a postdoctoral " +
+            "research fellow at Princeton University, in collaboration with Michael Franke and Noah Goodman who are faculty members. This study takes approximately 2-3 minutes to complete.</p>" +
+            "<p align='left'>If you agree to take part in the research, you will read a series of short stories " +
+            "and will be asked to move a slider to answer some questions. " +
+            "All of the information we obtain during the research will be anonymized " +
+            "and will not be associated with your name in any way. </p>" +
+            "<p align='left'>If you have any questions about this research, do not hesitate to " +
+            "contact Robert Hawkins at hawkrobe@gmail.com. If you have any questions " +
+            "about your rights or treatment as a participant in this research project, " +
+            "please contact the Princeton Office for Research Integrity and Assurance " +
+            "by phone at 609-258-0865 or by email at ria@princeton.edu.</p>" +
+            "<p align='left'>By consenting to participate, you acknowledge that you are 18 years " +
+            "or older, have read this consent form, agree to its contents, and agree " +
+            "to take part in this research. If you do not wish to consent, close " +
+            "this page and return the task.</p></font>",
+        choices: ['I consent to participate.']
+    }
+    var welcome = {
+        type: jsPsychInstructions,
+        pages: [
+            '<p align="left" style="width:600px">Thank you for choosing to participate!</p> <p align="left" style="width:600px">In this study we are interested in how you think about other people. </p>',
+            "<p align='left' style='width:600px'>On each trial, you will be given some information about a person:</p> <h3>'Suppose you learn someone likes Italian food.'</h3>" +
+                "<p align='left' style='width:600px'>Then we'll ask whether this information changes your opinion about something else: </p> <h3 style='width:500px;margin:auto'>'How much does that change your beliefs about whether they like spaghetti?'</h3>",
+            "<p align='left' style='width:600px'>You'll use a slider to answer the question. In some cases, you'll think it's now much less likely. In other cases you'll think it's much more likely. Sometimes it won't tell you anything, in which case you will move the slider to the midpoint.</p>",
+            "You'll see ten scenarios! Click 'Next' to begin!"
+        ],
+        show_clickable_nav: true
+    }
+    
+    var question_trial = {
+        type: jsPsychHtmlSliderResponse,
+        stimulus: function() {
+            var text = jsPsych.timelineVariable('scenario')
+            var comparison = "How much does that change your beliefs about whether they would also <b>" + jsPsych.timelineVariable('comparison') + '</b>?' 
+            return ('<p style="width:600px;text-align:left;margin:auto">' + text + '</p><br>' +     
+                    '<p style="width:600px;text-align:left;margin:auto">' + comparison + '</p>')
+        },
+        prompt: "",
+        labels: ['makes it much less likely', "doesn't tell me anything", "makes it much more likely"],
+        require_movement: true,
+        data: {
+            scenario: jsPsych.timelineVariable('scenario'),
+            comparison: jsPsych.timelineVariable('comparison'),
+            itemType: jsPsych.timelineVariable('itemType'),
+            stimulus_type: 'question'
+        }
+    };
+
+      var debrief_block = {
+          type: jsPsychHtmlButtonResponse,
+          stimulus: function () {
+              return `
+                <p>Thanks for participating in the experiment!</p>
+                <p>Press any key to submit the task and receive compensation!</p>
+                <p>After you exit, it is safe to close the screen. Your responses will be saved automatically.</p>
+              `;
+          },
+	choices: ['Submit']
+      };
+
+    /* define test procedure */
+    var main = {
+      timeline: [question_trial],
+        timeline_variables: _.map(_.keys(stimuli), key => {
+          const comparison = _.sample(stimuli[key])
+            const index = _.findIndex(stimuli[key], o => o == comparison)
+            console.log(comparison, stimuli[key])
+            console.log(index)
+          const itemType = index == 0 ? 'close competitor' : _.includes([1,2], index) ? 'same category' : 'other category'
+            return {scenario: key, comparison: comparison, itemType: itemType}}),
+      randomize_order: true
+    };
+      timeline.push(welcome)
+      timeline.push(main);
+      timeline.push(debrief_block); 
+    jsPsych.run(timeline);
+    </script>
+
+      
+</html>
