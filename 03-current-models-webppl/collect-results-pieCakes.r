@@ -108,7 +108,7 @@ priorPredSummary <- priorPred %>%
   do(aida::summarize_sample_vector(.$prob)) %>% 
   select(-Parameter)
 
-write_csv(priorPred, 'priorPred.csv')
+# write_csv(priorPred, 'priorPred.csv')
 
 answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'exhaustive', 'unclassified')
 

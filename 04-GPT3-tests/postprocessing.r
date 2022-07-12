@@ -81,3 +81,47 @@ GPT3Pred %>%
   xlab('answer type') +
   ylab('prediction') + 
   theme(strip.text.y = element_text(angle = 0))
+
+##################################################
+
+# also add empirical data
+d_byItem <- read_delim('../../magpie3-qa-overinfo-free-production/data+analysis/QA-overinfo-annotated.csv', delim = ";") %>% 
+  rename(exhaustive = full) %>% 
+  group_by(itemName) %>% 
+  summarize(
+    taciturn = sum(taciturn, na.rm = T),
+    competitor = sum(competitor, na.rm = T),
+    `same category` = sum(`same category`, na.rm = T),
+    `other category` = sum(`other category`, na.rm = T),
+    exhaustive = sum(exhaustive, na.rm = T),
+    # unclassified = sum(other, na.rm = T)
+  ) %>% 
+  pivot_longer(cols = -itemName, names_to = 'answerType', values_to = "count") %>% 
+  group_by(itemName) %>% 
+  mutate(
+    proportion = count / sum(count),
+    answerType = factor(answerType, levels = answerOrder)
+  ) %>% 
+  select(-count) %>% 
+  rename(prediction = proportion) %>% 
+  mutate(model = "human")
+
+
+combinedData <- rbind(GPT3Pred, d_byItem)
+
+# get means and bootstrapped CIs, averaging across items
+sumStatsGPT3Pred <- combinedData %>% 
+  group_by(answerType, model) %>% 
+  tidyboot_mean(column = prediction) %>% 
+  arrange(answerType)
+
+# plot of average predictions over items
+sumStatsGPT3Pred %>% 
+  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), alpha = 0.3, width =0.2) +
+  facet_grid(model ~ .) +
+  theme(legend.position = 'none') +
+  xlab('') +
+  ylab('') +
+  theme(strip.text.y = element_text(angle = 0))
