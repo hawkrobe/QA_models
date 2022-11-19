@@ -40,23 +40,6 @@ run_model_tso <- function (params, utils) {
   return(output)
 }
 
-params <- tibble(
-  'policyAlpha'      = 2.5,
-  'questionerAlpha'  = 4,
-  'R1Alpha'          = 3,
-  'relevanceBetaR0'  = 0,
-  'relevanceBetaR1'  = 0.95,
-  'costWeight'       = 0.45,
-  'questionCost'     = 0.25
-)
-
-utils <- tibble(
-  'utilTarget'       = c(7, 7.1),
-  'utilCompetitor'   = c(6, 5.9),
-  'utilSameCat'      = c(4 , 4.05),
-  'utilOtherCat'     = c(1, 0.8)
-)
-
 priorSampleParams <- function() {
   params <- tibble(
     'policyAlpha'      = runif(1,min = 2.25, max = 2.75),
@@ -64,7 +47,7 @@ priorSampleParams <- function() {
     'R1Alpha'          = runif(1,min = 2.75, max = 3.25),
     'relevanceBetaR0'  = 0,
     'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97),
-    'costWeight'       = runif(1,min = 0.5, max = ),
+    'costWeight'       = runif(1,min = 0.5, max = 3),
     'questionCost'     = runif(1,min = 0.2, max = 0.3)
   )
   return(params)
@@ -77,7 +60,7 @@ priorSampleUtils <- function() {
                     0.8,  0.8,  1.0, -0.5,
                    -0.5, -0.5, -0.5,  1.0), byrow = T, nrow = 4)
   # sample from MV-Guassian
-  pSample <- rmvnorm(n = 1, mean = c(7,6,4,1), sigma = sigma)
+  pSample <- rmvnorm(n = 1, mean = c(7,5,4,2), sigma = sigma)
   utils <- tibble(
     'utilTarget'       = pSample[1],
     'utilCompetitor'   = pSample[2],
