@@ -1,157 +1,158 @@
 library(rwebppl) # devtools::install_github("mhtess/rwebppl")
 library(tidyverse)
+library(mvtnorm)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 
 
-run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_name = "R1Posterior_BinaryPrefs", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
-  webPPL_data = tibble(
-    'task' = task_name,
-    'R0Alpha'          = 0.0001,
-    'policyAlpha'      = 2.5,
-    'qquestionerAlpha' = 4,
-    'R1Alpha'          = 3,
-    'relevanceBetaR0'  = 0,
-    'relevanceBetaR1'  = 0.95,
-    'costWeight'       = 0.45,
-    'questionCost'     = 0.25
-  )
+##################################################
+
+# these options help Stan run faster
+options(mc.cores = parallel::detectCores())
+
+# use the aida-theme for plotting
+theme_set(theme_aida())
+
+# global color scheme / non-optimized
+project_colors = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
+
+# setting theme colors globally
+scale_colour_discrete <- function(...) {
+  scale_colour_manual(..., values = project_colors)
+}
+scale_fill_discrete <- function(...) {
+  scale_fill_manual(..., values = project_colors)
+} 
+
+##################################################
+
+run_model_tso <- function (params, utils) {
+  
+  webPPL_data <- tibble('task' = "TSO") %>% 
+    cbind(params) %>% 
+    cbind(utils)
+  
   webppl(
-    program_file = model_file_name,
+    program_file = "qa-models-current.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
-
-  nr_highlight_levels = c(length(highlight1) >0, length(highlight2) >0, length(highlight3) >0, length(highlight4) >0) %>% sum()
-  print(nr_highlight_levels)
-  if (nr_highlight_levels == 0) {
-    highlight_values = "#505B55"
-  } else {
-    highlight_values = c(c("#B04035", "#FFA811", "#6494ED", "#006600")[1:nr_highlight_levels], "#505B55")
-  }
-
-  output %>%
-    as_tibble() %>%
-    mutate(support = fct_reorder(support, round(prob,3))) %>%
-    mutate(
-      highlight_level = case_when(
-        support %in% highlight1 ~ "highlight_1",
-        support %in% highlight2 ~ "highlight_2",
-        support %in% highlight3 ~ "highlight_3",
-        support %in% highlight4 ~ "highlight_4",
-        TRUE ~ "no_highlight"
-      )
-    ) %>%
-    filter(prob >= 1e-20) %>%
-    ggplot(aes(
-      x = support,
-      y = prob,
-      fill = highlight_level
-      )) +
-    geom_col() + coord_flip() +
-    scale_fill_manual(name = "area", values=highlight_values) +
-    xlab("") +
-    ylab("") +
-    theme_aida() +
-    theme(legend.position="none")
-
-  factor = 3
-  ggsave(filename = paste0("pics/results-", task_name, file_name_addition, ".pdf"), width = 16/factor, height = 9/factor)
-
+  
+  return(output)
 }
 
-run_model_tso <- function (model_file_name = "qa-models-current.webppl", task_name = "TSO", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
-  webPPL_data = tibble(
-    'task'             = task_name,
-    'R0Alpha'          = 0.0001,
+params <- tibble(
+  'policyAlpha'      = 2.5,
+  'questionerAlpha'  = 4,
+  'R1Alpha'          = 3,
+  'relevanceBetaR0'  = 0,
+  'relevanceBetaR1'  = 0.95,
+  'costWeight'       = 0.45,
+  'questionCost'     = 0.25
+)
+
+utils <- tibble(
+  'utilTarget'       = c(7, 7.1),
+  'utilCompetitor'   = c(6, 5.9),
+  'utilSameCat'      = c(4 , 4.05),
+  'utilOtherCat'     = c(1, 0.8)
+)
+
+priorSampleParams <- function() {
+  params <- tibble(
+    'policyAlpha'      = runif(1,min = 2.25, max = 2.75),
+    'questionerAlpha'  = runif(1,min = 3.75, max = 4.25),
+    'R1Alpha'          = runif(1,min = 2.75, max = 3.25),
+    'relevanceBetaR0'  = 0,
+    'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97),
+    'costWeight'       = runif(1,min = 0.5, max = ),
+    'questionCost'     = runif(1,min = 0.2, max = 0.3)
+  )
+  return(params)
+}
+
+priorSampleUtils <- function() {
+  # covariance matrix for MV-Gaussian
+  sigma = matrix(c( 1.0,  0.9,  0.8, -0.5,
+                    0.9,  1.0,  0.8, -0.5,
+                    0.8,  0.8,  1.0, -0.5,
+                   -0.5, -0.5, -0.5,  1.0), byrow = T, nrow = 4)
+  # sample from MV-Guassian
+  pSample <- rmvnorm(n = 1, mean = c(7,6,4,1), sigma = sigma)
+  utils <- tibble(
+    'utilTarget'       = pSample[1],
+    'utilCompetitor'   = pSample[2],
+    'utilSameCat'      = pSample[3],
+    'utilOtherCat'     = pSample[4]
+  )
+  return(utils)
+}
+
+priorSampleParamsFixed <- function() {
+  params <- tibble(
     'policyAlpha'      = 2.5,
     'questionerAlpha'  = 4,
     'R1Alpha'          = 3,
     'relevanceBetaR0'  = 0,
-    'relevanceBetaR1'  = 0.95,
+    'relevanceBetaR1'  = 0.96,
     'costWeight'       = 0.45,
-    'questionCost'     = 0.25,
-    'utilTarget'       = 7,
-    'utilCompetitor'   = 6,
-    'utilSameCat'      = 4,
-    'utilOtherCat'     = 1
+    'questionCost'     = 0.25
   )
-  webppl(
-    program_file = model_file_name,
-    data = webPPL_data,
-    data_var = "RInput"
-  ) -> output
-  return(output)
+  return(params)
 }
 
-run_model_tso()
+priorSampleUtilsFixed <- function() {
+  utils <- tibble(
+    'utilTarget'       = 15,
+    'utilCompetitor'   = 10,
+    'utilSameCat'      = 10,
+    'utilOtherCat'     = 5
+  )
+  return(utils)
+}
+
+n_samples = 100
+
+priorPred <- map_df(1:n_samples, function(i) {
+  message('run ', i)
+  params <- priorSampleParams()
+  ## params <- priorSampleParamsFixed()
+  ## show(params)
+  utils  <- priorSampleUtils()
+  ## utils  <- priorSampleUtilsFixed()
+  ## show(utils)
+  out    <- tibble('run' = i) %>%
+    cbind(params) %>%
+    cbind(utils) %>%
+    cbind(run_model_tso(params, utils))
+  return (out)
+})
+
+write_csv(priorPred, 'priorPred.csv')
+## priorPred <- read_csv('priorPred.csv')
+
+priorPredSummary <- priorPred %>% 
+  group_by(support) %>% 
+  do(aida::summarize_sample_vector(.$prob)) %>% 
+  select(-Parameter)
 
 
+answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'exhaustive', 'unclassified')
 
-
-run_plot_model(task_name = "safeAnswererPositive")
-run_plot_model(task_name = "safeAnswererNegative")
-
-run_plot_model(task_name = "pieCakeContextMinimal")
-run_plot_model(task_name = "pieCakeContextMinimalWithPreferences",
-               highlight1 = "RP?",
-               highlight2 = "LC?",
-               highlight3 = c("AS?", "SC?"))
-run_plot_model(task_name = "pieCakeContext")
-run_plot_model(task_name = "pieCakeContextAdditivePreferences", highlight1 = "Anything w/ raspberry?", highlight2 = "Anything w/ lemon?", highlight3 = "Pie?", highlight4 = "Cake?")
-run_plot_model(task_name = "pieCakeContextBiasedPessimist", highlight1 = "Which goods?", highlight2= "Anything?")
-run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "-against-pessimist", highlight1 = "Which goods?", highlight2= "Anything?")
-run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "no-highlight")
-run_plot_model(task_name = "pieCakeContextBiasedNoPref", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?"))
-run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "-against-opinionated", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?", "Lemon cake?"))
-
-
-run_plot_model(task_name = "R1Responses_BinaryPrefs")
-run_plot_model(task_name = "R1Posterior_BinaryPrefs")
-
-
-## get data for continuous inference
-
-webPPL_data = tibble('task' = "continuousInference")
-contInf_data <- webppl(
-    program_file = "qa-models-current.webppl",
-    data = webPPL_data,
-    data_var = "RInput"
+priorPredSummary %>% 
+  mutate(
+    answerType = case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      support == "no.otherCat" ~ 'other category'
+    ) %>% factor(levels = answerOrder)
   ) %>% 
-  pivot_wider(id_cols = Iteration, names_from = Parameter, values_from = value)
-  
-contInf_data %>%   mutate(RP_smaller = RP<LC) %>% 
-    ggplot(aes(x=RP, y=LC, color = RP_smaller)) +
-  geom_point(size=0.8, alpha = 0.3) + theme_aida() +
-  theme(legend.position = "none") +
-  xlim(-5,10) + ylim(-5,10) +
-  scale_color_manual(values=highlight_values[c(3,5)])
-
-factor = 3
-ggsave(filename = paste0("pics/results-", "continuousInference", ".pdf"), width = 9/factor, height = 6/factor)
-
-message("Posterior of RP > 0: ", mean(contInf_data$RP > 0))
-message("Posterior of LC > 0: ", mean(contInf_data$LC > 0))
-message("Posterior of RP > LP: ", mean(contInf_data$RP > contInf_data$LC))
+  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
+  theme(legend.position = 'none') +
+  xlab('answer type') +
+  ylab('mean prior predictive')
 
 
-        
-highlight_values = c("#B04035", "#FFA811", "#6494ED", "#006600", "#505B55")
-## prior plot
-prior_samples <- tibble(RP = rnorm(4000,2,2),
-       LC = RP + rnorm(4000,0,1),
-       RP_smaller = RP < LC) 
-
-message("Prior of RP > 0: " , mean(prior_samples$RP > 0))
-message("Prior of LC > 0: " , mean(prior_samples$LC > 0))
-message("Prior of RP > LP: ", mean(prior_samples$RP > prior_samples$LC))
-
-
-prior_samples %>% 
-  ggplot(aes(x=RP, y=LC, color = RP_smaller)) +
-  geom_point(size=0.8, alpha = 0.3) + theme_aida() +
-  theme(legend.position = "none") +
-  xlim(-5,10) + ylim(-5,10) +
-  scale_color_manual(values=highlight_values[c(3,5)])
-  
-factor = 3
-ggsave(filename = paste0("pics/results-", "continuousInference-prior", ".pdf"), width = 9/factor, height = 6/factor)

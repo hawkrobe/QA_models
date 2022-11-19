@@ -1,6 +1,6 @@
-//  -----------
-// | utilities |
-//  ----------
+//  -------------------
+// | utility functions |
+//  -------------------
 
 // poor person's barplot emulation for terminal
 var terminalViz = function(dist, precisionLevel) {
@@ -537,19 +537,19 @@ var cost = function(response,params) {
 // 'tso' : 'target-same-other' example used in the first experiments
 ////////////////////////////////////////////////////////////////////
 
-var tsoAtoms = ['target', 'competitor', 'sameCat', 'otherCat1', 'otherCat2']
+var tsoAtoms = ['target', 'competitor', 'sameCat', 'otherCat']
 
 var tsoContextSets      = prepareContextSets(tsoAtoms);
 var tsoPowerSet         = tsoContextSets.powerSet;
 var tsoR1WHResponses    = tsoContextSets.R1WHResponses;
-// var tsoR1PolarResponses = tsoContextSets.R1PolarResponses;
-var tsoR1PolarResponses = [
-  'no.---',
-  'no.competitor',
-  'no.competitor+sameCat',
-  'no.otherCat1+otherCat2',
-  'no.competitor+sameCat+otherCat1+otherCat2'
-]
+var tsoR1PolarResponses = tsoContextSets.R1PolarResponses;
+// var tsoR1PolarResponses = [
+//   'no.---',
+//   'no.competitor',
+//   'no.competitor+sameCat',
+//   'no.otherCat',
+//   'no.competitor+sameCat+otherCat'
+// ]
 
 var tsoContext = {
   name : "tsoContext",
@@ -559,19 +559,19 @@ var tsoContext = {
     {type: 'single-item', queried: ['target'], text: 'Target?'},
     {type: 'single-item', queried: ['competitor'], text: 'Competitor?'},
     {type: 'single-item', queried: ['sameCat'], text: 'Same Cagegory?'},
-    {type: 'single-item', queried: ['otherCat1'], text: 'Other Category 1?'},
-    {type: 'single-item', queried: ['otherCat2'], text: 'Other Category 2?'},
+    {type: 'single-item', queried: ['otherCat'], text: 'Other Category?'},
     {type: 'wh', queried: tsoAtoms, text: 'Which elements?'},
   ],
   questionerBeliefs: Categorical({vs: tsoPowerSet}),
-  R0PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat1+otherCat2'}),
-  R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat1+otherCat2'}),
+  R0PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
+  R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
   decisionProblem: function(w, a) {
     return _.includes(w, a) ?
-      (a == 'target' ? 7 :
-       a == 'competitor' ? 6 :
-       a == 'sameCat' ? 4 : 1) :
-      0.0000001;
+                     (a == 'target'     ? 7 :
+                      a == 'competitor' ? 6  :
+                      a == 'sameCat'    ? 4  :
+                                          1) :
+               0.0001;
   },
 
   // R0 chooses among responses licensed by the question
@@ -605,14 +605,16 @@ var tsoContext = {
   meaning: meaningFunction
 };
 
+////////////////////////////////////////////////////////////////////////////
 //  -----------
 // | Q&A model |
 //  -----------
+////////////////////////////////////////////////////////////////////////////
 
 // soft-max choice for EU given beliefs and utils in DP
 // yields the 'action policy' of the decision maker
 var getActionPolicy = function(beliefs, context, params) {
-  return Infer({method: 'enumerate'}, function() {
+  var actPol = Infer({method: 'enumerate'}, function() {
     var action = uniformDraw(context.actions);
     var decisionProblem = context.decisionProblem;
     var EU = expectation(beliefs, function(world) {
@@ -621,11 +623,12 @@ var getActionPolicy = function(beliefs, context, params) {
     factor(params.policyAlpha * EU);
     return action;
   });
+  return actPol
 };
 
 
 // returns TRUE if a response is contradictory in the light of the question
-// example: "Do you have any pie?" "No, we have lemon pie."
+// example: "Do you have any pie?" - "No, we have lemon pie."
 var isContradiction = function(context, question, response) {
   var meaning = context.meaning;
   var isContra = all(
@@ -652,12 +655,14 @@ var updateBeliefs = function(beliefs, question, response, context) {
 };
 
 // utility of a question is equal to the expected _value_ of the
-// DP after receiving a response; _value_ depends on DM's action policy
+// DP after receiving a response minus the cost:
+// U(Q)
+// _value_ depends on DM's action policy
 var questionUtility = function(utterance, beliefs, context, params) {
   // questioner wants to *maximize* expected payoff under decision problem
   var decisionProblem = context.decisionProblem;
-  var actionPolicy = getActionPolicy(beliefs, context, params);
-  var actionUtility = expectation(actionPolicy, function(action) {
+  var actionPolicy    = getActionPolicy(beliefs, context, params);
+  var actionUtility   = expectation(actionPolicy, function(action) {
     // weight possible actions proportional to reward
     return expectation(beliefs, function(world) {
       return decisionProblem(world, action);
@@ -666,29 +671,31 @@ var questionUtility = function(utterance, beliefs, context, params) {
   return actionUtility - cost(utterance, params);
 };
 
-// responder wants to bring questioner's beliefs and/or action policy
-// as close to their own as possible
-var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta, params) {
-  // respondent wants to *minimize* KL b/w beliefs (bringing closer to own belief)
-  var epistemicUtility = -KL(beliefs1, beliefs2);
-  var actionUtility = -KL(getActionPolicy(beliefs1, context, params),
-                          getActionPolicy(beliefs2, context, params));
-  return ((1 - relevanceBeta) * epistemicUtility
-          + relevanceBeta * actionUtility
-          - cost(utterance, params));
-};
+// DEPRECATED: currently only used in (deprecated) R1Sampler
+// // responder wants to bring questioner's beliefs and/or action policy
+// // as close to their own as possible
+// var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta, params) {
+//   // respondent wants to *minimize* KL b/w beliefs (bringing closer to own belief)
+//   var epistemicUtility = -KL(beliefs1, beliefs2);
+//   var actionUtility = -KL(getActionPolicy(beliefs1, context, params),
+//                           getActionPolicy(beliefs2, context, params));
+//   return ((1 - relevanceBeta) * epistemicUtility
+//           + relevanceBeta * actionUtility
+//           - cost(utterance, params));
+// };
 
 // base-level respondent chooses any safe and true answer
-// with equal probability
+// with equal probability;
+// by construction, the function getLicensedResponseR0(question)
+// is the set of all safe and true answers
 var R0 = cache(function(question, context, params) {
+  var R0BeliefSupport = context.R0PriorOverWorlds.support();  // this is always a Delta-belief
+  var world = R0BeliefSupport[0];
   var getLicensedResponsesR0 = context.getLicensedResponsesR0;
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(getLicensedResponsesR0(question));
-    //     console.log(response);
-    var ownBeliefs = context.R0PriorOverWorlds;
-    var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-    //     console.log('updated beliefs', otherBeliefs);
-    factor(params.R0Alpha * answerUtility(response, ownBeliefs, otherBeliefs, context, params.relevanceBetaR0, params));
+    var meaning = context.meaning;
+    condition(meaning(world, question, response))
     return response;
   });
 });
@@ -698,6 +705,7 @@ var R1ContextFree = cache(function(question, context, params) {
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
+  // console.log("R1 dummy, licensed responses: ", responses)
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
     // console.log(response);
@@ -713,7 +721,7 @@ var R1ContextFree = cache(function(question, context, params) {
 // gives updated beliefs about world state after hearing response to question
 // based on a pragmatic interpretation of the response (as emitted by R0)
 var updateBeliefsPragmatic = function(beliefs, question, response, context, params) {
-  var meaning = context.meaning;
+  // var meaning = context.meaning;
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
     var pragmaticResponse = R0(question, extend(context, {
@@ -816,45 +824,56 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext, param
   )
 })
 
-// R1Sampler is a sampling-based non-normative agent
-var R1Sampler = cache(function(context, R1PriorContext, question, params) {
-  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
-  var responses = filter(function(r) {!isContradiction(context, question, r)},
-                         getLicensedResponsesR1(question));
-  return Infer({method: 'enumerate'}, function(){
-    var context_label  = sample(R1PriorContext.distribution);
-    var context_sample = extend(
-      R1PriorContext[context_label],
-      {R1PriorOverWorlds: context.R1PriorOverWorlds});
-    var questioner = Q1(context_sample, params);
-    factor(questioner.score(question.text));
-    var response = uniformDraw(responses);
-    var ownBeliefs = context.R1PriorOverWorlds;
-    var otherBeliefs = updateBeliefs(context_sample.questionerBeliefs, question, response, context_sample);
-    var utility = answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1, params);
-    factor(params.R1Alpha * utility);
-    return {context_label, response};
-  });
-});
+// // R1Sampler is a sampling-based non-normative agent
+// var R1Sampler = cache(function(context, R1PriorContext, question, params) {
+//   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+//   var responses = filter(function(r) {!isContradiction(context, question, r)},
+//                          getLicensedResponsesR1(question));
+//   return Infer({method: 'enumerate'}, function(){
+//     var context_label  = sample(R1PriorContext.distribution);
+//     var context_sample = extend(
+//       R1PriorContext[context_label],
+//       {R1PriorOverWorlds: context.R1PriorOverWorlds});
+//     var questioner = Q1(context_sample, params);
+//     factor(questioner.score(question.text));
+//     var response = uniformDraw(responses);
+//     var ownBeliefs = context.R1PriorOverWorlds;
+//     var otherBeliefs = updateBeliefs(context_sample.questionerBeliefs, question, response, context_sample);
+//     var utility = answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1, params);
+//     factor(params.R1Alpha * utility);
+//     return {context_label, response};
+//   });
+// });
 
-// R1 Averager is full rational reasoner, it's what we use preferably
+// R1 Averager is full rational reasoner, integrating over all relevant uncertainty
+// key assumptions:
+// - R1 assumes that their responses will be exhaustified (currently with fixed alpha = 10);
+//   this assumption is very important, and also deals with "unawareness": not choosing anything
+//   that wasn't mentioned blindly
 var R1Averager = cache(function(context, R1PriorContext, question, params) {
+  // console.log("R1 averager ---------------\nquestion given: ", question);
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
+  // console.log("available responses: ", responses);
   var ownBeliefs = context.R1PriorOverWorlds;
-  var contextPosterior = marginalize(R1ContextPosterior(context, question, R1PriorContext, params), 'sample');
+  var contextPosterior = marginalize(R1ContextPosterior(context, question,
+                                                        R1PriorContext, params), 'sample');
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
-    // console.log("considering response: ", response)
+     // console.log("\nconsidering response: ", response);
     var expectedUtility = expectation(
       contextPosterior,
       function(context_sample) {
-        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs, question, response, context_sample, params);
-        // console.log("updated beliefs after response: ", response)
-        // terminalViz(otherBeliefs, 4)
+          // console.log("Context sample: ", context_sample);
+        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs,
+                                                    question, response, context_sample, params);
+         // console.log("updated beliefs after response: ", response)
+         // terminalViz(otherBeliefs, 4)
         var decisionProblem = context_sample.decisionProblem;
         var actionPolicy = getActionPolicy(otherBeliefs, context, params);
+          // console.log("action policy: ")
+          // terminalViz(actionPolicy, 4)
         var actionUtility = expectation(actionPolicy, function(action) {
           // weight possible actions proportional to reward
           return expectation(otherBeliefs, function(world) {
@@ -865,7 +884,6 @@ var R1Averager = cache(function(context, R1PriorContext, question, params) {
                   params.relevanceBetaR1 * actionUtility -
                   cost(response,params))
         return (EU)
-        // return answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1, params)
       }
     )
     factor(params.R1Alpha * expectedUtility);
@@ -1008,7 +1026,6 @@ var makeR = function(){
 
     var params =
       {
-        R0Alpha         : RInput[0].R0Alpha,
         policyAlpha     : RInput[0].policyAlpha,
         questionerAlpha : RInput[0].questionerAlpha,
         R1Alpha         : RInput[0].R1Alpha,
@@ -1045,10 +1062,22 @@ var makeR = function(){
     // terminalViz(marginalize(R1posterior, 'label'),4)
 
     var R1Prediction = R1Averager(contextLocal, R1Prior, question, params)
+    var R1PredictionReduced = Infer({
+      method: 'enumerate'},
+      function() {
+        var response = sample(R1Prediction);
+        var match = response == 'no.---' ? true :
+            response == 'no.competitor' ? true :
+            response == 'no.competitor+sameCat' ? true :
+            response == 'no.otherCat' ? true :
+            response == 'no.competitor+sameCat+otherCat' ? true : false
+        condition(match)
+        return(response)
+      })
     // console.log("R1-Averager:")
-    // terminalViz(R1Prediction,4)
+    // terminalViz(R1PredictionReduced,4)
 
-    return(R1Prediction)
+    return(R1PredictionReduced)
   }
 
   if (RInput[0].task == "continuousInference") {
@@ -1252,6 +1281,10 @@ var consoleOutTSO = function(params) {
   console.log("R0:")
   terminalViz(R0_test, 4)
 
+  var Q1_test = Q1(context, params)
+  console.log("Q1:")
+  terminalViz(Q1_test, 4)
+
   // var R0Ext_test = R1ContextFree(question, context, params)
   // console.log("R0 (extended):")
   // terminalViz(R0Ext_test, 4)
@@ -1271,13 +1304,25 @@ var consoleOutTSO = function(params) {
   terminalViz(marginalize(R1posterior, 'label'),4)
 
   var R1Prediction = R1Averager(tsoContext, R1Prior_FullKnowledge, question, params)
+  var R1PredictionReduced = Infer({
+    method: 'enumerate'},
+    function() {
+      var response = sample(R1Prediction);
+      var match = response == 'no.---' ? true :
+          response == 'no.competitor' ? true :
+          response == 'no.competitor+sameCat' ? true :
+          response == 'no.otherCat' ? true :
+          response == 'no.competitor+sameCat+otherCat' ? true : false
+      condition(match)
+      return(response)
+    })
   console.log("R1-Averager (full knowledge):")
-  terminalViz(R1Prediction,4)
+  terminalViz(R1PredictionReduced,4)
 
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// control center      : functions only work in the browser
+// control center      : main functions to call
 // ---
 // makeR               : use in connection with 'collect-webppl-results.r'
 // consoleOut          : use w/ terminal for dev
@@ -1291,13 +1336,12 @@ var consoleOutTSO = function(params) {
 //  -------------------
 
 var paramsGlobal = {
-  R0Alpha         : 0.0001,
-  policyAlpha     : 2.5,
-  questionerAlpha : 4,
-  R1Alpha         : 3,
-  relevanceBetaR0 : 0,     // beta=1 for only action-utility
+  policyAlpha     : 2.5,    // SM-alpha for action policy
+  questionerAlpha : 4,      // SM-alpha for question choice
+  R1Alpha         : 3,      // SM-alpha for R1
+  relevanceBetaR0 : 0,      // beta=1 for only action-utility
   relevanceBetaR1 : 0.95,   //
-  costWeight      : 0.45,
+  costWeight      : 2.5,
   questionCost    : 0.25    // cost for a question (relative to no question)
 };
 
