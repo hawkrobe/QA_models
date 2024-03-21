@@ -17,3 +17,4 @@
 *.run.xml
 .DS_Store
 auto
+/05-preference-elicitation/node_modules/
