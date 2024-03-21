@@ -567,8 +567,8 @@ var tsoContext = {
   R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
   decisionProblem: function(w, a) {
     return _.includes(w, a) ?
-                     (a == 'target'     ? 7 :
-                      a == 'competitor' ? 6  :
+                     (a == 'target'     ? 50 :
+                      a == 'competitor' ? 50  :
                       a == 'sameCat'    ? 4  :
                                           1) :
                0.0001;
@@ -1341,16 +1341,16 @@ var paramsGlobal = {
   R1Alpha         : 3,      // SM-alpha for R1
   relevanceBetaR0 : 0,      // beta=1 for only action-utility
   relevanceBetaR1 : 0.95,   //
-  costWeight      : 2.5,
+  costWeight      : 0.5,
   questionCost    : 0.25    // cost for a question (relative to no question)
 };
 
 
-makeR()
+// makeR()
 // consoleOut(paramsGlobal)
 // continuousInference(paramsGlobal)
 // consoleOutQ1ContInf(5,-1, paramsGlobal)
 
-// consoleOutTSO(paramsGlobal); // compare against pilot data from N=50
+consoleOutTSO(paramsGlobal); // compare against pilot data from N=50
           // frequency of answer types:
           // 0.1267 0.5698 0.2068 0.0000 0.0967
