@@ -1,0 +1,267 @@
+////////////////////////////////////////////////////////////////////////////
+//  -----------
+// | Q&A model |
+//  -----------
+////////////////////////////////////////////////////////////////////////////
+
+// response cost is proportional to length in words
+var cost = function(response,params) {
+  return _.includes(response, "---") ? 0 : params.costWeight * (response.split('+').length);
+};
+
+// soft-max choice for EU given beliefs and utils in DP
+// yields the 'action policy' of the decision maker
+var getActionPolicy = function(beliefs, context, params) {
+  var actPol = Infer({method: 'enumerate'}, function() {
+    var action = uniformDraw(context.actions);
+    var decisionProblem = context.decisionProblem;
+    var EU = expectation(beliefs, function(world) {
+      decisionProblem(world,action)
+    })
+    factor(params.policyAlpha * EU);
+    return action;
+  });
+  return actPol
+};
+
+// returns TRUE if a response is contradictory in the light of the question
+// example: "Do you have any pie?" - "No, we have lemon pie."
+var isContradiction = function(context, question, response) {
+  var meaning = context.meaning;
+  var isContra = all(
+    function(world) {
+      !meaning(world,question,response)
+    },
+    context.worlds
+  )
+  // if (isContra) {
+  //   console.log("Contradiction hit: ", question.text, response)
+  // }
+  return isContra
+}
+
+// gives updated beliefs about world state after hearing response to question
+// based on a literal interpretation of the response
+var updateBeliefs = function(beliefs, question, response, context) {
+  var meaning = context.meaning;
+  return Infer({method: 'enumerate'}, function() {
+    var world = sample(beliefs);
+    condition(meaning(world, question, response));
+    return world;
+  });
+};
+
+// utility of a question is equal to the expected _value_ of the
+// DP after receiving a response minus the cost:
+// U(Q)
+// _value_ depends on DM's action policy
+var questionUtility = function(utterance, beliefs, context, params) {
+  // questioner wants to *maximize* expected payoff under decision problem
+  var decisionProblem = context.decisionProblem;
+  var actionPolicy    = getActionPolicy(beliefs, context, params);
+  var actionUtility   = expectation(actionPolicy, function(action) {
+    // weight possible actions proportional to reward
+    return expectation(beliefs, function(world) {
+      return decisionProblem(world, action);
+    });
+  });
+  return actionUtility - cost(utterance, params);
+};
+
+// DEPRECATED: currently only used in (deprecated) R1Sampler
+// // responder wants to bring questioner's beliefs and/or action policy
+// // as close to their own as possible
+// var answerUtility = function(utterance, beliefs1, beliefs2, context, relevanceBeta, params) {
+//   // respondent wants to *minimize* KL b/w beliefs (bringing closer to own belief)
+//   var epistemicUtility = -KL(beliefs1, beliefs2);
+//   var actionUtility = -KL(getActionPolicy(beliefs1, context, params),
+//                           getActionPolicy(beliefs2, context, params));
+//   return ((1 - relevanceBeta) * epistemicUtility
+//           + relevanceBeta * actionUtility
+//           - cost(utterance, params));
+// };
+
+// base-level respondent chooses any safe and true answer
+// with equal probability;
+// by construction, the function getLicensedResponseR0(question)
+// is the set of all safe and true answers
+var R0 = cache(function(question, context, params) {
+  var R0BeliefSupport = context.R0PriorOverWorlds.support();  // this is always a Delta-belief
+  var world = R0BeliefSupport[0];
+  var getLicensedResponsesR0 = context.getLicensedResponsesR0;
+  return Infer({method: 'enumerate'}, function(){
+    var response = uniformDraw(getLicensedResponsesR0(question));
+    var meaning = context.meaning;
+    condition(meaning(world, question, response))
+    return response;
+  });
+});
+
+// dummy R0 with response set of R1
+var R1ContextFree = cache(function(question, context, params) {
+  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+  var responses = filter(function(r) {!isContradiction(context, question, r)},
+                         getLicensedResponsesR1(question));
+  // console.log("R1 dummy, licensed responses: ", responses)
+  return Infer({method: 'enumerate'}, function(){
+    var response = uniformDraw(responses);
+    // console.log(response);
+    var ownBeliefs = context.R0PriorOverWorlds;
+    var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
+    // console.log('updated beliefs: ');
+    // terminalViz(otherBeliefs, 4);
+    factor(10 * (-KL(ownBeliefs, otherBeliefs) - cost(response, params)));
+    return response;
+  });
+});
+
+// gives updated beliefs about world state after hearing response to question
+// based on a pragmatic interpretation of the response (as emitted by R0)
+var updateBeliefsPragmatic = function(beliefs, question, response, context, params) {
+  // var meaning = context.meaning;
+  return Infer({method: 'enumerate'}, function() {
+    var world = sample(beliefs);
+    var pragmaticResponse = R0(question, extend(context, {
+      R0PriorOverWorlds: Delta({v: world})
+    }), params);
+    observe(pragmaticResponse,response)
+    return world;
+  });
+};
+
+// gives updated beliefs about world state after hearing response to question
+// based on a pragmatic interpretation (as emitted by R0 w/ full answer set of R1)
+var updateBeliefsPragmaticR1 = function(beliefs, question, response, context, params) {
+  var meaning = context.meaning;
+  return Infer({method: 'enumerate'}, function() {
+    var world = sample(beliefs);
+    var pragmaticResponse = R1ContextFree(question, extend(context, {
+      R0PriorOverWorlds: Delta({v: world})
+    }), params);
+    observe(pragmaticResponse,response)
+    return world;
+  });
+};
+
+// Q1 selects a question with prob proportional to the expected
+// value of the DP after hearing a response
+var Q1 = function(context, params) {
+  return Infer({method: 'enumerate'}, function(){
+    var question = uniformDraw(context.questions);
+    // console.log('considering question', question.queried);
+    var expectedUtility = expectation(context.questionerBeliefs, function(trueWorld) {
+      // console.log('in possible world', trueWorld);
+      var possibleResponses = R0(question, extend(context, {
+        R0PriorOverWorlds: Delta({v: trueWorld})
+      }), params)
+      // console.log('respondent: ', possibleResponses)
+      return expectation(possibleResponses, function(response) {
+        // console.log('considering response ', response );
+        var currBeliefs = context.questionerBeliefs;
+        var updatedBeliefs = updateBeliefsPragmatic(currBeliefs, question, response, context, params);
+        return questionUtility(response, updatedBeliefs, context, params);
+      });
+    });
+    //     console.log('expected utility: ',expectedUtility)
+    var questionCost = question.type == 'no-question' ? 0 : params.questionCost;
+    factor(params.questionerAlpha * (expectedUtility - questionCost));
+    return question.text;
+  });
+};
+
+//////////////////////////////////////////////////
+// R1 : pragmatic respondent
+// ---
+// R1's prior beliefs are a distribution over
+// different context which differ only wrt
+// the questioner's beliefs and/or preferences.
+// There are two kinds of R1: a sampler and an
+// averager. The former is computationally faster,
+// the latter is "normatively correct".
+//////////////////////////////////////////////////
+
+var R1ContextPosterior = cache(function(context, question, R1PriorContext, params) {
+  Infer(
+    {method:'enumerate'},
+    function() {
+      var context_label  = sample(R1PriorContext.distribution);
+      var context_sample = extend(
+        R1PriorContext[context_label],
+        {R1PriorOverWorlds: context.R1PriorOverWorlds});
+      var questioner = Q1(context_sample, params);
+      // console.log("considering context: ", context_label);
+      // console.log("prob of question ", question.text, ": ", questioner.score(question.text));
+      factor(questioner.score(question.text));
+      return {label: context_label, sample: context_sample, name: context_sample.name}
+    }
+  )
+})
+
+// // DEPRECATED R1Sampler is a sampling-based non-normative agent
+// var R1Sampler = cache(function(context, R1PriorContext, question, params) {
+//   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+//   var responses = filter(function(r) {!isContradiction(context, question, r)},
+//                          getLicensedResponsesR1(question));
+//   return Infer({method: 'enumerate'}, function(){
+//     var context_label  = sample(R1PriorContext.distribution);
+//     var context_sample = extend(
+//       R1PriorContext[context_label],
+//       {R1PriorOverWorlds: context.R1PriorOverWorlds});
+//     var questioner = Q1(context_sample, params);
+//     factor(questioner.score(question.text));
+//     var response = uniformDraw(responses);
+//     var ownBeliefs = context.R1PriorOverWorlds;
+//     var otherBeliefs = updateBeliefs(context_sample.questionerBeliefs, question, response, context_sample);
+//     var utility = answerUtility(response, ownBeliefs, otherBeliefs, context_sample, params.relevanceBetaR1, params);
+//     factor(params.R1Alpha * utility);
+//     return {context_label, response};
+//   });
+// });
+
+// R1 Averager is full rational reasoner, integrating over all relevant uncertainty
+// key assumptions:
+// - R1 assumes that their responses will be exhaustified (currently with fixed alpha = 10);
+//   this assumption is very important, and also deals with "unawareness": not choosing anything
+//   that wasn't mentioned blindly
+// - R1's beliefs (supplied by `R1PriorContext`) are a discrete distribution over contexts,
+//   which differ minimally, e.g, just in terms of preferences of the questioner
+var R1Averager = cache(function(context, R1PriorContext, question, params) {
+  // console.log("R1 averager ---------------\nquestion given: ", question);
+  var getLicensedResponsesR1 = context.getLicensedResponsesR1;
+  var responses = filter(function(r) {!isContradiction(context, question, r)},
+                         getLicensedResponsesR1(question));
+  // console.log("available responses: ", responses);
+  var ownBeliefs = context.R1PriorOverWorlds;
+  var contextPosterior = marginalize(R1ContextPosterior(context, question,
+                                                        R1PriorContext, params), 'sample');
+  return Infer({method: 'enumerate'}, function(){
+    var response = uniformDraw(responses);
+     // console.log("\nconsidering response: ", response);
+    var expectedUtility = expectation(
+      contextPosterior,
+      function(context_sample) {
+          // console.log("Context sample: ", context_sample);
+        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs,
+                                                    question, response, context_sample, params);
+         // console.log("updated beliefs after response: ", response)
+         // terminalViz(otherBeliefs, 4)
+        var decisionProblem = context_sample.decisionProblem;
+        var actionPolicy = getActionPolicy(otherBeliefs, context, params);
+          // console.log("action policy: ")
+          // terminalViz(actionPolicy, 4)
+        var actionUtility = expectation(actionPolicy, function(action) {
+          // weight possible actions proportional to reward
+          return expectation(otherBeliefs, function(world) {
+            return decisionProblem(world, action);
+          });
+        });
+        var EU = ((1-params.relevanceBetaR1) * -KL(ownBeliefs, otherBeliefs) +
+                  params.relevanceBetaR1 * actionUtility -
+                  cost(response,params))
+        return (EU)
+      }
+    )
+    factor(params.R1Alpha * expectedUtility);
+    return response;
+  });
+});

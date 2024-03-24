@@ -1,0 +1,38 @@
+// poor person's barplot emulation for terminal
+var terminalViz = function(dist, precisionLevel) {
+
+  var unfiltered_support = dist.support();
+  var unfiltered_probs   = map(function(x) {
+    return 1*dist.score(x).toPrecision(precisionLevel)}, dist.support())
+
+  var unsorted_probs   = filter(function(x) {return Math.exp(x) > 0},
+                                unfiltered_probs)
+  var unsorted_support = filter(function(x) {return Math.exp(dist.score(x)) > 0},
+                                unfiltered_support )
+
+  var sorted_probs     = sort(unsorted_probs);
+  var sortFunction = function(x) {
+    return -1*dist.score(x).toPrecision(precisionLevel)
+  }
+  var sorted_support   = sortOn(unsorted_support, sortFunction)
+  var max_length_element = _.max(map(function(e) {e.length}, sorted_support));
+  var scores = map(function(x) {
+    return 1*Math.exp(dist.score(x).toPrecision(precisionLevel)).toPrecision(precisionLevel)
+  }, sorted_support)
+  var maxScore =  _.max(map(function(e) {e}, scores));
+  map(
+    function(x) {
+      var score = 1*Math.exp(dist.score(x).toPrecision(precisionLevel)).toPrecision(precisionLevel)
+      console.log(" ",
+                  _.padEnd(x, max_length_element, " "),
+                  ": ",
+                  _.padEnd(_.repeat('*', score*20), 21),
+                  score
+                 )}
+    , sorted_support)
+  return "  ===viz==="
+}
+
+// module.exports = {
+//   terminalViz: terminalViz
+// };

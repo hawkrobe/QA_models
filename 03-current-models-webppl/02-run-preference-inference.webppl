@@ -1,0 +1,83 @@
+//  -------------------
+// | global parameters |
+//  -------------------
+
+var params = {
+  policyAlpha     : 2.5,    // SM-alpha for action policy
+  questionerAlpha : 6,      // SM-alpha for question choice
+  R1Alpha         : 3,      // SM-alpha for R1
+  relevanceBetaR0 : 0.5,    // beta=1 for only action-utility
+  relevanceBetaR1 : 0.95,   //
+  costWeight      : 0.5,
+  questionCost    : 0.25    // cost for a question (relative to no question)
+};
+
+//////////////////////////////////////////////////
+// inferring continuous preferences
+// ///////////////////////////////////////////////
+
+// build a context representation for a given pair of
+// payoff parameters
+var makeContext = function(RP, LC) {
+  extend(
+    pieCakeContextMinimal,
+    {
+      questions: [
+        {type: 'polar-disjunct', queried: ['RP'], text: 'RP?'},
+        {type: 'polar-disjunct', queried: ['LC'], text: 'LC?'},
+        // {type: 'wh', queried: bakedGoodsMinimal, text: 'which?'},
+        {type: 'no-question', queried: [], text: 'no-Q'}
+      ],
+      decisionProblem: function(w, a) {
+        return a == 'no-order' ? 0 :
+        _.includes(w, a) ? (
+          a == 'RP' ? RP  : RP+LC) : -1;
+      }
+    });
+}
+
+var getContInf = function(params){
+
+  var getScore = function(RP, LC) {
+    // build context with parameters
+    var c =  makeContext(RP, LC);
+    // questioner choice & score
+    var questioner = Q1(c, params)
+    var score = questioner.score('RP?')
+    return(score)
+  }
+
+  var contInf = Infer(
+    {method: "MCMC", samples: 4000},
+    function() {
+      // RP is the reference level
+      var RP = gaussian({mu: 2, sigma: 2});;
+      // 'coefficients': deviation from reference level
+      var LC = gaussian({mu: 0, sigma: 1});
+      factor(getScore(RP,LC))
+      var out = {RP: RP, LC: LC};
+      return (out)
+    }
+  )
+
+  return(contInf)
+
+}
+
+var continuousInference = function(params){
+  var cI = getContInf(params)
+  // use for visualization in the browser
+  viz(cI)
+  viz(marginalize(cI, "RP"))
+  viz(marginalize(cI, "LC"))
+  // TODO return summary stats for dev in the console
+}
+
+var consoleOutQ1ContInf = function(RP, LC, params) {
+  console.log('question probs with: RP =', RP, 'LC =', LC)
+  terminalViz(Q1(makeContext(RP,LC), params))
+}
+
+consoleOutQ1ContInf(20,0,params);
+
+continuousInference(params);
