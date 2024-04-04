@@ -4,7 +4,17 @@ library(aida)    # remotes::install_github("michael-franke/aida-package")
 
 
 run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_name = "R1Posterior_BinaryPrefs", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
-  webPPL_data = tibble('task' = task_name)
+  webPPL_data = tibble(
+    'task'             = task_name,
+    'R0Alpha'          = 0.0001,
+    'policyAlpha'      = 2.5,
+    'qquestionerAlpha' = 4,
+    'R1Alpha'          = 3,
+    'relevanceBetaR0'  = 0,
+    'relevanceBetaR1'  = 0.95,
+    'costWeight'       = 0.45,
+    'questionCost'     = 0.25
+  )
   webppl(
     program_file = model_file_name,
     data = webPPL_data,
@@ -49,6 +59,32 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
 
 }
 
+run_model_tso <- function (model_file_name = "qa-models-current.webppl", task_name = "TSO", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
+  webPPL_data = tibble(
+    'task'             = task_name,
+    'R0Alpha'          = 0.0001,
+    'policyAlpha'      = 2.5,
+    'questionerAlpha'  = 4,
+    'R1Alpha'          = 3,
+    'relevanceBetaR0'  = 0,
+    'relevanceBetaR1'  = 0.95,
+    'costWeight'       = 0.45,
+    'questionCost'     = 0.25,
+    'utilTarget'       = 7,
+    'utilCompetitor'   = 6,
+    'utilSameCat'      = 4,
+    'utilOtherCat'     = 1
+  )
+  webppl(
+    program_file = model_file_name,
+    data = webPPL_data,
+    data_var = "RInput"
+  ) -> output
+  return(output)
+}
+
+run_model_tso()
+
 run_plot_model(task_name = "safeAnswererPositive")
 run_plot_model(task_name = "safeAnswererNegative")
 
@@ -64,7 +100,6 @@ run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = 
 run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "no-highlight")
 run_plot_model(task_name = "pieCakeContextBiasedNoPref", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?"))
 run_plot_model(task_name = "pieCakeContextUnbiasedNoPref", file_name_addition = "-against-opinionated", highlight1 = c("Which goods?"), highlight2 = c("Raspberry pie?", "Lemon cake?"))
-
 
 run_plot_model(task_name = "R1Responses_BinaryPrefs")
 run_plot_model(task_name = "R1Posterior_BinaryPrefs")
@@ -116,4 +151,3 @@ prior_samples %>%
   
 factor = 3
 ggsave(filename = paste0("pics/results-", "continuousInference-prior", ".pdf"), width = 9/factor, height = 6/factor)
-  

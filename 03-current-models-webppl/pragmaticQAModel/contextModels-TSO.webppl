@@ -1,0 +1,64 @@
+////////////////////////////////////////////////////////////////////
+// 'tso' : minimal 'target-same-other' scenario
+////////////////////////////////////////////////////////////////////
+
+var tsoAtoms = ['target', 'competitor', 'sameCat', 'otherCat']
+
+var tsoContextSets      = prepareContextSets(tsoAtoms);
+var tsoPowerSet         = tsoContextSets.powerSet;
+var tsoR1WHResponses    = tsoContextSets.R1WHResponses;
+var tsoR1PolarResponses = tsoContextSets.R1PolarResponses;
+
+var tsoContext = {
+  name : "tsoContext",
+  worlds : tsoPowerSet,
+  actions: _.concat(tsoAtoms, "nothing"),
+  questions: [
+    {type: 'single-item', queried: ['target'], text: 'Target?'},
+    {type: 'single-item', queried: ['competitor'], text: 'Competitor?'},
+    {type: 'single-item', queried: ['sameCat'], text: 'Same Cagegory?'},
+    {type: 'single-item', queried: ['otherCat'], text: 'Other Category?'},
+    {type: 'wh', queried: tsoAtoms, text: 'Which elements?'},
+  ],
+  questionerBeliefs: Categorical({vs: tsoPowerSet}),
+  R0PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
+  R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
+  decisionProblem: function(w, a) {
+    return _.includes(w, a) ?
+                     (a == 'target'     ? 50 :
+                      a == 'competitor' ? 25  :
+                      a == 'sameCat'    ? 4  :
+                                          1) :
+               0.0001;
+  },
+
+  // R0 chooses among responses licensed by the question
+  getLicensedResponsesR0: function(question) {
+    if(question.type == 'single-item') {
+      // by definition polar questions require 'yes'/'no' answer
+      return ['yes', 'no'];
+    } else if(question.type == 'polar-disjunct') {
+      // by definition polar questions require 'yes'/'no' answer
+      var answers = ['yes', 'no'].concat(question.queried);
+      return answers;
+    } else if(question.type == 'wh') {
+      // 'wh' questions allow you to say any set of queried items,
+      // or to say "nothing" when none of the querried items exist
+      return replaceEmptyListWithStringNothing(
+        map(
+          function(v){return v.join('+');},
+          powerset(question.queried)
+        ));
+    } else {
+      return console.error('question type not yet supported: ' + question.type);
+    }
+  },
+
+  // R1 chooses among responses licensed by the question
+  getLicensedResponsesR1: function(question) {
+    return (question.type == 'wh' ?
+            tsoR1WHResponses : tsoR1PolarResponses)
+  },
+  // semantic meaning function
+  meaning: meaningFunction
+};

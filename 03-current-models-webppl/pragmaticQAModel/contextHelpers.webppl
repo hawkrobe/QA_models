@@ -1,0 +1,137 @@
+//  -----------------------------------------------
+// | helper functions for preparing context models |
+//  -----------------------------------------------
+//
+// Context models are built from a set of 'atoms', e.g.,
+// the whole set of single entities in the domain.
+//
+// The function 'prepareContextSets' returns a dictionary
+// with:
+// * the set of all world states (power set of atoms),
+// * the set of all licensed responses for R1 to a WH question
+// * the set of all licensed responses for R1 to a polar question
+//
+// The function 'meaningFunction' is the generic semantic function
+// to be used in (non-minimal) cases where more than one element/item
+// can be true/present.
+// TODO: check if the meaning function for the minimal context models
+// can be subsumed under this one.
+
+var prepareContextSets = function(atoms) {
+
+  // The function 'makePowerSet' takes a list of atoms as input and
+  // returns an array of strings describing each world state
+  // (e.g., which items are present).
+  var makePowerSet = function (atoms) {
+    // create string representation of all subsets of atoms
+    var setWithEmptyListElement = map(
+      function(v){return v.join('+');},
+      // add possibility to encode background knowledge of number k of available goods
+      filter(function(x) {return x.length <= 8}, powerset(atoms))
+    );
+    return(replaceEmptyListWithStringNothing(setWithEmptyListElement));
+  };
+
+  // The function 'makeR1polarResponses' takes the atoms and the power set and
+  // creates all licensed R1 responses to a polar question.
+  var makeR1polarResponses = function(atoms, powerSet) {
+
+    var sampleR1PolarResponses = Infer(
+      {method: 'enumerate'},
+      function() {
+        var yesNoPart = uniformDraw(["yes", "no"]);
+        var itemPart = uniformDraw(_.concat(filter(
+          function(x) {
+            if (x != "") {
+              return x
+            }
+          },
+          powerSet
+        ), "---", "nothing"));
+        return [yesNoPart, itemPart].join(".")
+      }
+    )
+
+    // exclude utterance 'no, we have ... exhaustive list of everything'
+    // and 'yes, we have nothing'
+    var x = map(function(a) {a == atoms[0] ? a : a + "+" }, atoms.reverse())
+    var contradiction = reduce(function(a, acc) { acc + a }, "no.", x)
+
+    var R1PolarResponses = filter(
+      function(r) {
+        // some responses can never be true
+        r != "yes.nothing" && r != contradiction
+      },
+      sampleR1PolarResponses.support());
+    return(R1PolarResponses)
+  }
+
+  var powerSet = makePowerSet(atoms);
+
+  // return powerset, R1 licencesed responses
+  var out = {
+    'atoms'            : atoms,
+    'powerSet'         : powerSet,
+    'R1WHResponses'    : powerSet,
+    'R1PolarResponses' : makeR1polarResponses(atoms, powerSet)
+  }
+  return(out)
+}
+
+
+var meaningFunction = function(world, question, response) {
+
+  // meaning of literals / atoms
+  var meaning_atomic = function(world, question, response) {
+    // console.log(" *** now evaluating response: part ", response)
+    if(response == '' || response == "---") {
+      // assume silence has null meaning
+      return true;
+    }
+    if(response == "nothing") {
+      if(world == "nothing") {
+        return true;
+      }
+    }
+    if(world == "nothing" && question.type == 'wh') {
+      return response == "nothing";
+    }
+    if(question.type == 'single-item') {
+      return (
+        response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+          response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+          all(function(item) {
+            return _.includes(world.split('+'), item);
+          }, response.split('+')));
+      // return (
+      //   response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+      //     response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+      //     console.error('Not a valid response to question:', question, response));
+    } else
+      if(question.type == 'polar-disjunct') {
+        return (
+          response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 :
+            response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 :
+            all(function(item) {
+              return _.includes(world.split('+'), item);
+            }, response.split('+')));
+      } else if(question.type == 'wh') {
+        // assume response is true when the shop contains every mentioned item
+        return all(function(item) {
+          return _.includes(world.split('+'), item);
+        }, response.split('+'));
+      } else {
+        return console.error('question type not yet supported: ' + question.type);
+      }
+  }
+
+  // meaning of conjunctions
+
+  return all(
+    function (r) {
+      meaning_atomic(world, question, r)
+    },
+    _.split(response, '.')
+  )
+
+}

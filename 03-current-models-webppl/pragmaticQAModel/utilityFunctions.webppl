@@ -1,0 +1,50 @@
+var butLast = function(xs){
+  return xs.slice(0, xs.length-1);
+};
+
+var KL = function(dist1, dist2){
+  var values = dist1.support();
+  return sum(map(function(value){
+    var scoreP = dist1.score(value);
+    var scoreQ = dist2.score(value);
+    var probP = Math.exp(scoreP);
+    var probQ = Math.exp(scoreQ);
+    return (probP == 0.0 ? 0.0 :
+            probQ == 0.0 ? 1000000:
+            probP * (scoreP - scoreQ));
+  }, values));
+};
+
+var SumSquares = function(dist1, dist2){
+  var values = dist1.support();
+  return sum(map(function(value){
+    var scoreP = dist1.score(value);
+    var scoreQ = dist2.score(value);
+    var probP = Math.exp(scoreP);
+    var probQ = Math.exp(scoreQ);
+    return ((scoreP - scoreQ)^2);
+  }, values));
+};
+
+var powerset = function(set) {
+  if (set.length == 0) {
+    return [[]];
+  } else {
+    var rest = powerset(set.slice(1));
+    return map(function(element) {
+      return [set[0]].concat(element);
+    }, rest).concat(rest);
+  }
+};
+
+// replace empty string with word 'nothing'
+var replaceEmptyListWithStringNothing = function(set) {
+  _.concat(filter(
+    function(x) {
+      if (x != "") {
+        return x
+      }
+    },
+    set
+  ), "nothing");
+}
