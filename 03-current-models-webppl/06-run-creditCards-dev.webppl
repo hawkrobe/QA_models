@@ -1,0 +1,159 @@
+//  -------------------
+// | global parameters |
+//  -------------------
+
+var params = {
+  policyAlpha     : 2.5,    // SM-alpha for action policy
+  questionerAlpha : 4,      // SM-alpha for question choice
+  R1Alpha         : 3,      // SM-alpha for R1
+  relevanceBetaR0 : 0,      // beta=1 for only action-utility
+  relevanceBetaR1 : 0.95,   //
+  costWeight      : 0.5,
+  questionCost    : 0.25    // cost for a question (relative to no question)
+};
+
+
+//  ------------------
+// | test CC example |
+//  ------------------
+
+
+var context = creditCardContext;
+console.log('context: \t', context.name);
+
+var worlds = context.worlds;
+console.log('worlds: \t', worlds);
+
+var question = context.questions[0];
+console.log('question: \t', question.text)
+
+var world = 'AE+MC';
+console.log('world: \t\t', world);
+
+var responsesR0 = context.getLicensedResponsesR0
+console.log('R0 resp. set: \t', responsesR0(question))
+
+var responseR0 = responsesR0(question)[0]
+console.log('response R0: \t', responseR0)
+
+var meaning = context.meaning
+console.log('truth R0 r.: \t', meaning(world,question,responseR0));
+
+var responsesR1 = context.getLicensedResponsesR1
+console.log('R1 resp. set \t: ', responsesR1(question))
+
+// map(
+//   function(world) {
+//     console.log("In world ('"+ world +"') the following of R1's responses are true: \n",
+//                 filter(function (r) {
+//                   meaning(world,question,r)
+//                 },
+//                        responsesR1(question))
+//                )
+//   },
+//   setsOfBakedGoods
+// )
+
+var responseR1 = responsesR1(question)[0]
+console.log('response R1: \t', responseR1)
+
+var meaning = context.meaning
+console.log('truth R1 r.: \t', meaning(world,question,responseR1));
+
+var R0_test = R0(question, context, params)
+
+console.log("R0:")
+terminalViz(R0_test, 4)
+
+var Q1_test = Q1(context, params)
+console.log("Q1:")
+terminalViz(Q1_test, 4)
+
+// var R0Ext_test = R1ContextFree(question, context, params)
+// console.log("R0 (extended):")
+// terminalViz(R0Ext_test, 4)
+
+// ---------------------------------------------
+// testing R1 with full knowledge of preferences
+// ---------------------------------------------
+
+console.log("---------------------------------------------\n",
+            "Testing R1 with full knowledge of credit card\n",
+            "---------------------------------------------\n")
+
+// R1 knows full context model
+var R1Prior_FullKnowledge = {
+  trueWorld: context,
+  distribution: Categorical({vs: ["trueWorld"]})
+}
+
+var R1posterior = R1ContextPosterior(context, question, R1Prior_FullKnowledge, params);
+console.log("Posterior inference (trivial)")
+terminalViz(marginalize(R1posterior, 'label'),4)
+
+
+var R1Prediction = R1Averager(context, R1Prior_FullKnowledge, question, params)
+console.log("R1-Averager (full knowledge):")
+terminalViz(R1Prediction)
+
+// ---------------------------------------------
+// testing R1 with uncertainty about preferences
+// ---------------------------------------------
+
+console.log("---------------------------------------------\n",
+            "Testing R1 with uncertainty abt credit card  \n",
+            "---------------------------------------------\n")
+
+// R1 considers three contexts equally likely /a priori/:
+// in 'AE' Q has American express (that's the one we already have)
+// in 'MC' Q has MasterCard
+// in 'CB' Q has Carte Blanche
+
+// create extended context (overwriting the preferences in 'tsoContext')
+var CCC_hiPri_MC = extend(
+  creditCardContext,
+  {name: 'CCC_hiPri_MC',
+    decisionProblem: function(w, a) {
+    return _.includes(w, 'MC') ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? 0 : 5);
+    }}
+)
+
+var CCC_hiPri_CB = extend(
+  creditCardContext,
+  {name: 'CCC_hiPriCB',
+    decisionProblem: function(w, a) {
+    return _.includes(w, 'CB') ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? 0 : 5);
+    }}
+)
+
+// define R1's beliefs about contexts
+var R1Prior_Uncertain = {
+  AE: creditCardContext,
+  MC: CCC_hiPri_MC,
+  CB: CCC_hiPri_CB,
+  distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3/6, 2/6, 1/6]})
+}
+
+var R1posterior = R1ContextPosterior(context, question, R1Prior_Uncertain, params);
+console.log("Posterior inference (non-trivial)")
+terminalViz(marginalize(R1posterior, 'label'),4)
+
+var R1Prediction = R1Averager(context, R1Prior_Uncertain, question, params)
+// var R1PredictionReduced = Infer({
+//   method: 'enumerate'},
+//   function() {
+//     var response = sample(R1Prediction);
+//     var match = response == 'no.---' ? true :
+//         response == 'no.competitor' ? true :
+//         response == 'no.competitor+sameCat' ? true :
+//         response == 'no.otherCat' ? true :
+//         response == 'no.competitor+sameCat+otherCat' ? true : false
+//     condition(match)
+//     return(response)
+//   })
+console.log("R1-Averager (uncertain preferences):")
+terminalViz(R1Prediction,4)
