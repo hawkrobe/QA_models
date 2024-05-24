@@ -105,7 +105,8 @@ var creditCardContext = {
 // 3. medPrior  with question "MC?"
 
 
-// highPrior contexts
+// highPrior contexts --------------
+
 var CCC_hiPri_AE = creditCardContext;
 var CCC_hiPri_MC = extend(
   creditCardContext,
@@ -134,7 +135,8 @@ var R1Prior_Uncertainty_highPior = {
   distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3/6, 2/6, 1/6]})
 }
 
-// lowPrior contexts
+// lowPrior contexts --------------
+
 var CCC_loPri_AE = extend(
   creditCardContext,
   {name: 'CCC_loPri_MC',
@@ -173,17 +175,13 @@ var R1Prior_Uncertainty_lowPior = {
   distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3/6, 2/6, 1/6]})
 }
 
-// medPrior contexts
+// medPrior contexts --------------
+
 var CCC_medPri_AE = extend(
   creditCardContext,
   {name: 'CCC_medPri_AE',
    R0PriorOverWorlds: Delta({v: 'AE+CB'}),
    R1PriorOverWorlds: Delta({v: 'AE+CB'}),
-   decisionProblem: function(w, a) {
-    return _.includes(w, 'AE') ?
-      (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
-    }
   }
 )
 var CCC_medPri_MC = extend(
