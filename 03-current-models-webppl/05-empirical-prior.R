@@ -52,14 +52,13 @@ full_matrix %>%
 #################################################
 
 run_model_tso <- function (params, utils) {
-  
   webPPL_data <- tibble('task' = "TSO") %>% 
     cbind(params) %>% 
     cbind(utils)
   
   webppl(
-    program_file = "./03-current-models-webppl/04-run-TSO-prior-predictive-R.webppl",
-    packages = c("./03-current-models-webppl/pragmaticQAModel"),
+    program_file = "04-run-TSO-prior-predictive-R.webppl",
+    packages = c("./pragmaticQAModel"),
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -79,36 +78,38 @@ priorSampleParams <- function() {
   )
   return(params)
 }
-
-empiricalPriorGaussian <- function(scenario) {
-  these_priors <- priors %>% filter(itemName == scenario, 
-                                    requested_option == "target")
-  target_val = pull(filter(these_priors, received_option == "target"), mean_response)
-  competitor_val = pull(filter(these_priors, received_option == "competitor"), mean_response)
-  same_val = pull(filter(these_priors, received_option == "sameCategory"), mean_response)
-  other_val = pull(filter(these_priors, received_option == "otherCategory"), mean_response)
-  print(these_priors)
-  # covariance matrix for MV-Gaussian
-  sigma = matrix(c( 1.0,  0.9,  0.8, -0.5,
-                    0.9,  1.0,  0.8, -0.5,
-                    0.8,  0.8,  1.0, -0.5,
-                    -0.5, -0.5, -0.5,  1.0), byrow = T, nrow = 4)
-  # sample from MV-Guassian
-  pSample <- rmvnorm(n = 1, mean = c(target_val,competitor_val,same_val,other_val), sigma = sigma)
-  utils <- tibble(
-    'utilTarget'       = pSample[1],
-    'utilCompetitor'   = pSample[2],
-    'utilSameCat'      = pSample[3],
-    'utilOtherCat'     = pSample[4]
-  )
-  return(utils)
-}
+# 
+# empiricalPriorGaussian <- function(scenario) {
+#   these_priors <- priors %>% filter(itemName == scenario, 
+#                                     requested_option == "target")
+#   target_val = pull(filter(these_priors, received_option == "target"), mean_response)
+#   competitor_val = pull(filter(these_priors, received_option == "competitor"), mean_response)
+#   same_val = pull(filter(these_priors, received_option == "sameCategory"), mean_response)
+#   other_val = pull(filter(these_priors, received_option == "otherCategory"), mean_response)
+#   print(these_priors)
+#   # covariance matrix for MV-Gaussian
+#   sigma = matrix(c( 1.0,  0.9,  0.8, -0.5,
+#                     0.9,  1.0,  0.8, -0.5,
+#                     0.8,  0.8,  1.0, -0.5,
+#                     -0.5, -0.5, -0.5,  1.0), byrow = T, nrow = 4)
+#   # sample from MV-Guassian
+#   pSample <- rmvnorm(n = 1, mean = c(target_val,competitor_val,same_val,other_val), sigma = sigma)
+#   utils <- tibble(
+#     'utilTarget'       = pSample[1],
+#     'utilCompetitor'   = pSample[2],
+#     'utilSameCat'      = pSample[3],
+#     'utilOtherCat'     = pSample[4]
+#   )
+#   return(utils)
+# }
 
 empiricalPrior <- function(scenario) {
-  print(scenario)
-  these_priors <- full_matrix %>% filter(itemName == scenario, 
-                                    targetOption == "itemQuestion") %>%
+  these_priors <- full_matrix %>% 
+    mutate(targetOption = fct_relevel(targetOption, 'itemQuestion', 'competitor', 'sameCategory', 'otherCategory')) %>%
+    group_by(targetOption) %>%
+    filter(itemName == scenario) %>%
     sample_n(1)
+    
   utils <- tibble(
     'utilTarget'       = these_priors$itemQuestion,
     'utilCompetitor'   = these_priors$competitor,
@@ -118,11 +119,11 @@ empiricalPrior <- function(scenario) {
   return(utils)
 }
 
-samples_each = 100
+samples_each = 10
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
-priorPred <- purrr::map_dfr(1:n_samples, function(i) {
+priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   message('run ', i)
   scenario = scenarios_rep[i]
   params <- priorSampleParams()
@@ -131,11 +132,10 @@ priorPred <- purrr::map_dfr(1:n_samples, function(i) {
   ## show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
-    cbind(utils) %>%
     cbind(scenario) %>%
     cbind(run_model_tso(params, utils))
   return (out)
-})
+}, .progress = TRUE)
 
 write_csv(priorPred, 'priorPredbyScenarioxSubj.csv')
 ## priorPred <- read_csv('priorPredbyScenario.csv')

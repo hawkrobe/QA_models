@@ -1,17 +1,3 @@
-// //  -------------------
-// // | global parameters |
-// //  -------------------
-
-// var params = {
-//   policyAlpha     : 2.5,    // SM-alpha for action policy
-//   questionerAlpha : 4,      // SM-alpha for question choice
-//   R1Alpha         : 3,      // SM-alpha for R1
-//   relevanceBetaR0 : 0,      // beta=1 for only action-utility
-//   relevanceBetaR1 : 0.95,   //
-//   costWeight      : 0.5,
-//   questionCost    : 0.25    // cost for a question (relative to no question)
-// };
-
 
 //////////////////////////////////////////////////
 // output for R script
@@ -36,10 +22,7 @@ var makeR = function(){
         questionCost    : RInput[0].questionCost      // cost for a question (relative to no question)
       }
 
-    // console.log('before: ', paramsGlobal)
-    // console.log('after: ', params)
-
-    var contextLocal = extend(
+    var contextTarget = extend(
       tsoContext,
       {decisionProblem : function(w, a) {
         return _.includes(w, a) ?
@@ -50,19 +33,52 @@ var makeR = function(){
       }}
     )
 
-    var question = contextLocal.questions[0];
+    var contextCompetitor = extend(
+      tsoContext,
+      {decisionProblem : function(w, a) {
+        return _.includes(w, a) ?
+          (a == 'target' ? RInput[1].utilTarget :
+           a == 'competitor' ? RInput[1].utilCompetitor :
+           a == 'sameCat' ? RInput[1].utilSameCat : RInput[1].utilOtherCat) :
+          0.0000001;
+      }}
+    )
 
-    // R1 knows full context model
+
+    var contextSameCat = extend(
+      tsoContext,
+      {decisionProblem : function(w, a) {
+        return _.includes(w, a) ?
+          (a == 'target' ? RInput[2].utilTarget :
+           a == 'competitor' ? RInput[2].utilCompetitor :
+           a == 'sameCat' ? RInput[2].utilSameCat : RInput[2].utilOtherCat) :
+          0.0000001;
+      }}
+    )
+
+    var contextOtherCat = extend(
+      tsoContext,
+      {decisionProblem : function(w, a) {
+        return _.includes(w, a) ?
+          (a == 'target' ? RInput[3].utilTarget :
+           a == 'competitor' ? RInput[3].utilCompetitor :
+           a == 'sameCat' ? RInput[3].utilSameCat : RInput[3].utilOtherCat) :
+          0.0000001;
+      }}
+    )
+
+    var question = tsoContext.questions[0];
+
+    // R1 uncertain
     var R1Prior = {
-      trueWorld: contextLocal,
-      distribution: Categorical({vs: ["trueWorld"]})
+      target: contextTarget,
+      competitor: contextCompetitor,
+      sameCat: contextSameCat,
+      otherCat: contextOtherCat,
+      distribution: Categorical({vs: ["target", "competitor", "sameCat", "otherCat"]})
     }
-
-    // var R1posterior = R1ContextPosterior(contextLocal, question, R1Prior, params);
-    // console.log("Posterior inference:")
-    // terminalViz(marginalize(R1posterior, 'label'),4)
-
-    var R1Prediction = R1Averager(contextLocal, R1Prior, question, params)
+    
+    var R1Prediction = R1Averager(tsoContext, R1Prior, question, params)
     var R1PredictionReduced = Infer({
       method: 'enumerate'},
       function() {
