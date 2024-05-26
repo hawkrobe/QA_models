@@ -34,7 +34,22 @@ scenarios <- unique(priors$itemName)
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_QA-overinfo-freeTyping-cogsci_full_anonymized_categorized.csv"
 empirical_responses <- read_csv(url(urlfile))
 
+urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E1-priorElicitation-sliderRating-full_450_anonymized.csv"
+full_matrix_data <- read_csv(url(urlfile))
+
 ##################################################
+
+# reformat full matrix data
+
+full_matrix <- full_matrix_data %>%
+  filter(trial_type == "main") %>%
+  select(submission_id, itemName, targetOption,
+         itemQuestion, competitor, otherCategory, sameCategory) 
+
+full_matrix %>%
+  count(itemName, targetOption) %>% View()
+
+#################################################
 
 run_model_tso <- function (params, utils) {
   
@@ -43,8 +58,8 @@ run_model_tso <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "04-run-TSO-prior-predictive-R.webppl",
-    packages = c("./pragmaticQAModel"),
+    program_file = "./03-current-models-webppl/04-run-TSO-prior-predictive-R.webppl",
+    packages = c("./03-current-models-webppl/pragmaticQAModel"),
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -65,7 +80,7 @@ priorSampleParams <- function() {
   return(params)
 }
 
-empiricalPrior <- function(scenario) {
+empiricalPriorGaussian <- function(scenario) {
   these_priors <- priors %>% filter(itemName == scenario, 
                                     requested_option == "target")
   target_val = pull(filter(these_priors, received_option == "target"), mean_response)
@@ -89,6 +104,20 @@ empiricalPrior <- function(scenario) {
   return(utils)
 }
 
+empiricalPrior <- function(scenario) {
+  print(scenario)
+  these_priors <- full_matrix %>% filter(itemName == scenario, 
+                                    targetOption == "itemQuestion") %>%
+    sample_n(1)
+  utils <- tibble(
+    'utilTarget'       = these_priors$itemQuestion,
+    'utilCompetitor'   = these_priors$competitor,
+    'utilSameCat'      = these_priors$sameCategory,
+    'utilOtherCat'     = these_priors$otherCategory
+  )
+  return(utils)
+}
+
 samples_each = 100
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
@@ -108,7 +137,7 @@ priorPred <- purrr::map_dfr(1:n_samples, function(i) {
   return (out)
 })
 
-write_csv(priorPred, 'priorPredbyScenario.csv')
+write_csv(priorPred, 'priorPredbyScenarioxSubj.csv')
 ## priorPred <- read_csv('priorPredbyScenario.csv')
 
 priorPredSummary <- priorPred %>% 
@@ -143,7 +172,8 @@ empirical_recoded %>%
   geom_col() +
   theme(legend.position = 'none') +
   xlab('answer type') +
-  ylab('mean prior predictive')
+  ylab('mean prior predictive') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 priorpred_recoded <- priorPredSummary %>% 
   dplyr::mutate(
@@ -160,10 +190,11 @@ priorpred_recoded %>%
   ggplot(aes(x = answerType, fill = answerType, y = mean)) +
   facet_wrap(~scenario) +
   geom_col() +
-  geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
+  #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
   theme(legend.position = 'none') +
   xlab('answer type') +
-  ylab('mean prior predictive')
+  ylab('mean prior predictive') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 priorpred_recoded %>%
   group_by(scenario, answerType) %>%
@@ -176,3 +207,25 @@ priorpred_recoded %>%
             by = c("scenario", "answerType")) %>%
   ggplot(aes(x = human_mean, y = mean)) +
   geom_point()
+
+priorpred_recoded %>%
+  group_by(scenario, answerType) %>%
+  summarise(all_prop = sum(mean)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(mean = all_prop/sum(all_prop)) %>%
+  select(-all_prop) %>%
+  left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
+            by = c("scenario", "answerType")) %>%
+  ggplot(aes(x = answerType, fill = answerType, y = human_mean)) +
+  geom_crossbar(aes(ymin=mean,ymax=mean,y = mean),
+                position = position_dodge(.5), width = .5,
+                alpha = .5, size = .5) + 
+  facet_wrap(~scenario) +
+  geom_col() +
+  #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
+  theme(legend.position = 'none') +
+  xlab('answer type') +
+  ylab('mean prior predictive') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
