@@ -68,40 +68,16 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 2.25, max = 2.75),
-    'questionerAlpha'  = runif(1,min = 3.75, max = 4.25),
-    'R1Alpha'          = runif(1,min = 2.75, max = 3.25),
+    'policyAlpha'      = runif(1,min = 3, max = 3),
+    'questionerAlpha'  = runif(1,min = 1, max = 2),
+    'R1Alpha'          = runif(1,min = 1, max = 2),
     'relevanceBetaR0'  = 0,
     'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97),
-    'costWeight'       = runif(1,min = 0.5, max = 3),
-    'questionCost'     = runif(1,min = 0.2, max = 0.3)
+    'costWeight'       = runif(1,min = 0.5, max = 0.5),
+    'questionCost'     = runif(1,min = 0.2, max = 0.2)
   )
   return(params)
 }
-# 
-# empiricalPriorGaussian <- function(scenario) {
-#   these_priors <- priors %>% filter(itemName == scenario, 
-#                                     requested_option == "target")
-#   target_val = pull(filter(these_priors, received_option == "target"), mean_response)
-#   competitor_val = pull(filter(these_priors, received_option == "competitor"), mean_response)
-#   same_val = pull(filter(these_priors, received_option == "sameCategory"), mean_response)
-#   other_val = pull(filter(these_priors, received_option == "otherCategory"), mean_response)
-#   print(these_priors)
-#   # covariance matrix for MV-Gaussian
-#   sigma = matrix(c( 1.0,  0.9,  0.8, -0.5,
-#                     0.9,  1.0,  0.8, -0.5,
-#                     0.8,  0.8,  1.0, -0.5,
-#                     -0.5, -0.5, -0.5,  1.0), byrow = T, nrow = 4)
-#   # sample from MV-Guassian
-#   pSample <- rmvnorm(n = 1, mean = c(target_val,competitor_val,same_val,other_val), sigma = sigma)
-#   utils <- tibble(
-#     'utilTarget'       = pSample[1],
-#     'utilCompetitor'   = pSample[2],
-#     'utilSameCat'      = pSample[3],
-#     'utilOtherCat'     = pSample[4]
-#   )
-#   return(utils)
-# }
 
 empiricalPrior <- function(scenario) {
   these_priors <- full_matrix %>% 
@@ -119,23 +95,23 @@ empiricalPrior <- function(scenario) {
   return(utils)
 }
 
-samples_each = 10
+# run samples in parallel 
+samples_each = 100
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
+plan(multisession, workers = 100)
 priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   message('run ', i)
   scenario = scenarios_rep[i]
   params <- priorSampleParams()
-  ## show(params)
   utils  <- empiricalPrior(scenario)
-  ## show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(scenario) %>%
     cbind(run_model_tso(params, utils))
   return (out)
-}, .progress = TRUE)
+}, .progress = TRUE, .options = furrr_options(seed = 123))
 
 write_csv(priorPred, 'priorPredbyScenarioxSubj.csv')
 ## priorPred <- read_csv('priorPredbyScenario.csv')
@@ -206,7 +182,10 @@ priorpred_recoded %>%
   left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
             by = c("scenario", "answerType")) %>%
   ggplot(aes(x = human_mean, y = mean)) +
-  geom_point()
+    geom_point() +
+    geom_smooth(method = 'lm') +
+    geom_abline(aes(intercept = 0, slope = 1)) +
+    theme(aspect.ratio = 1)
 
 priorpred_recoded %>%
   group_by(scenario, answerType) %>%
@@ -218,14 +197,17 @@ priorpred_recoded %>%
   left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
             by = c("scenario", "answerType")) %>%
   ggplot(aes(x = answerType, fill = answerType, y = human_mean)) +
-  geom_crossbar(aes(ymin=mean,ymax=mean,y = mean),
-                position = position_dodge(.5), width = .5,
-                alpha = .5, size = .5) + 
-  facet_wrap(~scenario) +
-  geom_col() +
-  #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
-  theme(legend.position = 'none') +
-  xlab('answer type') +
-  ylab('mean prior predictive') + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    geom_col() +
+    geom_crossbar(aes(ymin=mean,ymax=mean,y = mean),
+                  position = position_dodge(.5), width = .5,
+                  alpha = .5, size = .5) + 
+    facet_wrap(~scenario) +
+    #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
+    theme(legend.position = 'none') +
+    xlab('answer type') +
+    ylab('mean prior predictive') + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
 

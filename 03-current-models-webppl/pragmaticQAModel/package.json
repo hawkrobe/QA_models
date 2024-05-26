@@ -6,7 +6,7 @@
     "wppl": ["terminalViz.webppl",
              "utilityFunctions.webppl",
              "contextHelpers.webppl",
-             "contextModels-PieCake.webppl",
+             "contextModels-pieCake.webppl",
              "contextModels-TSO.webppl",
              "pragmaticQA-core-model.webppl"
             ]

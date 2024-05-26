@@ -6,8 +6,8 @@
 // function to call when using RwebPPL
 var makeR = function(){
 
-  console.log("Starting task: ", RInput[0].task)
-
+ // console.log("Starting task: ", RInput[0].task)
+ // console.log("R1Input", RInput)
   if (RInput[0].task == "TSO") {
     // target-same-other setting (1st pilot)
 
