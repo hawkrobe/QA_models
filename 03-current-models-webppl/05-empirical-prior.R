@@ -113,8 +113,8 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-write_csv(priorPred, 'priorPredbyScenarioxSubj.csv')
-## priorPred <- read_csv('priorPredbyScenario.csv')
+#write_csv(priorPred, 'priorPredbyScenarioxSubj.csv')
+priorPred <- read_csv('priorPredbyScenarioxSubj.csv')
 
 priorPredSummary <- priorPred %>% 
   dplyr::group_by(scenario, support) %>% 
