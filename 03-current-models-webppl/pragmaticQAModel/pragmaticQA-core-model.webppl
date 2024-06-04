@@ -236,25 +236,26 @@ var R1Averager = cache(function(context, R1PriorContext, question, params) {
                                                         R1PriorContext, params), 'sample');
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
-     // console.log("\nconsidering response: ", response);
+    // console.log("\n\n\n\n\n\n **** Considering response: ", response);
     var expectedUtility = expectation(
       contextPosterior,
       function(context_sample) {
-          // console.log("Context sample: ", context_sample);
+        // console.log("\nContext sample: ", context_sample.name);
         var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs,
                                                     question, response, context_sample, params);
-         // console.log("updated beliefs after response: ", response)
-         // terminalViz(otherBeliefs, 4)
+        // console.log("updated beliefs after response: ", response)
+        // terminalViz(otherBeliefs, 4)
         var decisionProblem = context_sample.decisionProblem;
-        var actionPolicy = getActionPolicy(otherBeliefs, context, params);
-          // console.log("action policy: ")
-          // terminalViz(actionPolicy, 4)
+        var actionPolicy = getActionPolicy(otherBeliefs, context_sample, params);
+        // console.log("action policy after response: ", response)
+        // terminalViz(actionPolicy, 4)
         var actionUtility = expectation(actionPolicy, function(action) {
           // weight possible actions proportional to reward
           return expectation(otherBeliefs, function(world) {
             return decisionProblem(world, action);
           });
         });
+        // console.log("action utility: ", actionUtility)
         var EU = ((1-params.relevanceBetaR1) * -KL(ownBeliefs, otherBeliefs) +
                   params.relevanceBetaR1 * actionUtility -
                   cost(response,params))
