@@ -107,42 +107,98 @@ var creditCardContext = {
 
 // highPrior contexts --------------
 
-var CCC_hiPri_AE = creditCardContext;
+
+var CCC_hiPri_AE = extend(
+  creditCardContext,
+  {name: 'CCC_hiPri_AE',
+   R0PriorOverWorlds: Delta({v: 'AE+MC'}),
+   R1PriorOverWorlds: Delta({v: 'AE+MC'}),
+   decisionProblem: function(w, a) {
+   return _.includes(w, 'AE') ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
 var CCC_hiPri_MC = extend(
   creditCardContext,
   {name: 'CCC_hiPri_MC',
+   R0PriorOverWorlds: Delta({v: 'AE+MC'}),
+   R1PriorOverWorlds: Delta({v: 'AE+MC'}),
     decisionProblem: function(w, a) {
     return _.includes(w, 'MC') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
+      (a == 'go' ? -10 : 0);
     }}
 )
 var CCC_hiPri_CB = extend(
   creditCardContext,
-  {name: 'CCC_hiPriCB',
+  {name: 'CCC_hiPri_CB',
+   R0PriorOverWorlds: Delta({v: 'AE+MC'}),
+   R1PriorOverWorlds: Delta({v: 'AE+MC'}),
     decisionProblem: function(w, a) {
     return _.includes(w, 'CB') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_hiPri_AE_MC = extend(
+  creditCardContext,
+  {name: 'CCC_hiPri_AE_MC',
+   R0PriorOverWorlds: Delta({v: 'AE+MC'}),
+   R1PriorOverWorlds: Delta({v: 'AE+MC'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['AE','MC']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_hiPri_AE_CB = extend(
+  creditCardContext,
+  {name: 'CCC_hiPri_AE_CB',
+   R0PriorOverWorlds: Delta({v: 'AE+MC'}),
+   R1PriorOverWorlds: Delta({v: 'AE+MC'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['AE','CB']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_hiPri_MC_CB = extend(
+  creditCardContext,
+  {name: 'CCC_hiPri_MC_CB',
+   R0PriorOverWorlds: Delta({v: 'AE+MC'}),
+   R1PriorOverWorlds: Delta({v: 'AE+MC'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['MC','CB']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
     }}
 )
 
-// define R1's beliefs about contexts
+
 var R1Prior_Uncertainty_highPior = {
   AE: CCC_hiPri_AE,
   MC: CCC_hiPri_MC,
   CB: CCC_hiPri_CB,
-  distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3/6, 2/6, 1/6]})
+  // distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3,2,1]}),
+  AE_MC: CCC_hiPri_AE_MC,
+  AE_CB: CCC_hiPri_AE_CB,
+  MC_CB: CCC_hiPri_MC_CB,
+  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB"], ps: [6,4,1,5,3,2]})
 }
 
 // lowPrior contexts --------------
 
 var CCC_loPri_AE = extend(
   creditCardContext,
-  {name: 'CCC_loPri_MC',
+  {name: 'CCC_loPri_AE',
    R0PriorOverWorlds: Delta({v: 'MC+CB'}),
-   R1PriorOverWorlds: Delta({v: 'MC+CB'})
-  }
+   R1PriorOverWorlds: Delta({v: 'MC+CB'}),
+   decisionProblem: function(w, a) {
+   return _.includes(w, 'AE') ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
 )
 var CCC_loPri_MC = extend(
   creditCardContext,
@@ -152,28 +208,66 @@ var CCC_loPri_MC = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'MC') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
+      (a == 'go' ? -10 : 0);
     }}
 )
 var CCC_loPri_CB = extend(
   creditCardContext,
-  {name: 'CCC_loPriCB',
+  {name: 'CCC_loPri_CB',
    R0PriorOverWorlds: Delta({v: 'MC+CB'}),
    R1PriorOverWorlds: Delta({v: 'MC+CB'}),
     decisionProblem: function(w, a) {
     return _.includes(w, 'CB') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_loPri_AE_MC = extend(
+  creditCardContext,
+  {name: 'CCC_loPri_AE_MC',
+   R0PriorOverWorlds: Delta({v: 'MC+CB'}),
+   R1PriorOverWorlds: Delta({v: 'MC+CB'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['AE','MC']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_loPri_AE_CB = extend(
+  creditCardContext,
+  {name: 'CCC_loPri_AE_CB',
+   R0PriorOverWorlds: Delta({v: 'MC+CB'}),
+   R1PriorOverWorlds: Delta({v: 'MC+CB'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['AE','CB']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_loPri_MC_CB = extend(
+  creditCardContext,
+  {name: 'CCC_loPri_MC_CB',
+   R0PriorOverWorlds: Delta({v: 'MC+CB'}),
+   R1PriorOverWorlds: Delta({v: 'MC+CB'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['MC','CB']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
     }}
 )
 
-// define R1's beliefs about contexts
+
 var R1Prior_Uncertainty_lowPior = {
   AE: CCC_loPri_AE,
   MC: CCC_loPri_MC,
   CB: CCC_loPri_CB,
-  distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3/6, 2/6, 1/6]})
+  // distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3,2,1]}),
+  AE_MC: CCC_loPri_AE_MC,
+  AE_CB: CCC_loPri_AE_CB,
+  MC_CB: CCC_loPri_MC_CB,
+  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB"], ps: [6,4,1,5,3,2]})
 }
+
 
 // medPrior contexts --------------
 
@@ -182,7 +276,11 @@ var CCC_medPri_AE = extend(
   {name: 'CCC_medPri_AE',
    R0PriorOverWorlds: Delta({v: 'AE+CB'}),
    R1PriorOverWorlds: Delta({v: 'AE+CB'}),
-  }
+   decisionProblem: function(w, a) {
+   return _.includes(w, 'AE') ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
 )
 var CCC_medPri_MC = extend(
   creditCardContext,
@@ -192,7 +290,7 @@ var CCC_medPri_MC = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'MC') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
+      (a == 'go' ? -10 : 0);
     }}
 )
 var CCC_medPri_CB = extend(
@@ -203,14 +301,52 @@ var CCC_medPri_CB = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'CB') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? 0 : 5);
+      (a == 'go' ? -10 : 0);
     }}
 )
+var CCC_medPri_AE_MC = extend(
+  creditCardContext,
+  {name: 'CCC_medPri_AE_MC',
+   R0PriorOverWorlds: Delta({v: 'AE+CB'}),
+   R1PriorOverWorlds: Delta({v: 'AE+CB'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['AE','MC']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_medPri_AE_CB = extend(
+  creditCardContext,
+  {name: 'CCC_medPri_AE_CB',
+   R0PriorOverWorlds: Delta({v: 'AE+CB'}),
+   R1PriorOverWorlds: Delta({v: 'AE+CB'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['AE','CB']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+var CCC_medPri_MC_CB = extend(
+  creditCardContext,
+  {name: 'CCC_medPri_MC_CB',
+   R0PriorOverWorlds: Delta({v: 'AE+CB'}),
+   R1PriorOverWorlds: Delta({v: 'AE+CB'}),
+    decisionProblem: function(w, a) {
+      return _.intersection(_.split(w, '+'), ['MC','CB']).length > 0 ?
+      (a == 'go' ? 5 : 0) :
+      (a == 'go' ? -10 : 0);
+    }}
+)
+
 
 // define R1's beliefs about contexts
 var R1Prior_Uncertainty_medPior = {
   AE: CCC_medPri_AE,
   MC: CCC_medPri_MC,
   CB: CCC_medPri_CB,
-  distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3/6, 2/6, 1/6]})
+  // distribution: Categorical({vs: ["AE", "MC", "CB"], ps: [3,2,1]}),
+  AE_MC: CCC_medPri_AE_MC,
+  AE_CB: CCC_medPri_AE_CB,
+  MC_CB: CCC_medPri_MC_CB,
+  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB"], ps: [6,4,1,5,3,2]})
 }

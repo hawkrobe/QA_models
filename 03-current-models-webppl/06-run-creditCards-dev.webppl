@@ -18,7 +18,7 @@ var params = {
 //  ------------------
 
 
-// var context = CCC_loPri_AE ;
+// var context = CCC_medPri_MC ;
 // console.log('context: \t', context.name);
 
 // var worlds = context.worlds;
@@ -27,7 +27,7 @@ var params = {
 // var question = context.questions[6];
 // console.log('question: \t', question.text)
 
-// var world = 'AE+MC';
+// var world = 'AE+CB';
 // console.log('world: \t\t', world);
 
 // var responsesR0 = context.getLicensedResponsesR0
@@ -181,6 +181,6 @@ var R1posterior = R1ContextPosterior(CCC_medPri_MC, question_3, R1Prior_Uncertai
 console.log("Posterior beliefs about which CC Questioner has:")
 terminalViz(marginalize(R1posterior, 'label'),4)
 
-var R1Prediction = R1Averager(CCC_medPri_MC, R1Prior_Uncertainty_medPior, question_3, params)
+var R1Prediction = R1Averager(CCC_medPri_AE, R1Prior_Uncertainty_medPior, question_3, params)
 console.log("Probability of answers:")
 terminalViz(R1Prediction,4)
