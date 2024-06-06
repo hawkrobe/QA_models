@@ -1,8 +1,8 @@
 library(rwebppl) # devtools::install_github("mhtess/rwebppl")
 library(tidyverse)
-library(mvtnorm)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 library(readr)
+library(furrr)
 
 ##################################################
 
@@ -47,7 +47,7 @@ full_matrix <- full_matrix_data %>%
          itemQuestion, competitor, otherCategory, sameCategory) 
 
 full_matrix %>%
-  count(itemName, targetOption) %>% View()
+  count(itemName, targetOption) 
 
 #################################################
 
@@ -57,8 +57,8 @@ run_model_tso <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "04-run-TSO-prior-predictive-R.webppl",
-    packages = c("./pragmaticQAModel"),
+    program_file = "./03-current-models-webppl/04-run-TSO-prior-predictive-R.webppl",
+    packages = c("./03-current-models-webppl/pragmaticQAModel"),
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -68,13 +68,13 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 3, max = 3),
-    'questionerAlpha'  = runif(1,min = 1, max = 2),
-    'R1Alpha'          = runif(1,min = 1, max = 2),
+    'policyAlpha'      = runif(1,min = 2, max = 6), #3
+    'questionerAlpha'  = runif(1,min = 1, max = 3), #1-2
+    'R1Alpha'          = runif(1,min = 1, max = 3), #1-2
     'relevanceBetaR0'  = 0,
-    'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97),
-    'costWeight'       = runif(1,min = 0.5, max = 0.5),
-    'questionCost'     = runif(1,min = 0.2, max = 0.2)
+    'relevanceBetaR1'  = runif(1,min = 0.90, max = 0.99), #0.95-0.97
+    'costWeight'       = runif(1,min = 0.2, max = 0.8), #0.5
+    'questionCost'     = runif(1,min = 0.2, max = 0.8) #0.2
   )
   return(params)
 }
@@ -113,8 +113,8 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-#write_csv(priorPred, 'priorPredbyScenarioxSubj.csv')
-priorPred <- read_csv('priorPredbyScenarioxSubj.csv')
+write_csv(priorPred, './03-current-models-webppl/data/prior_pred_full_matrix.csv')
+priorPred <- read_csv('prior_pred_full_matrix.csv')
 
 priorPredSummary <- priorPred %>% 
   dplyr::group_by(scenario, support) %>% 
