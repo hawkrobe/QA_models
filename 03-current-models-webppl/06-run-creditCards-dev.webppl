@@ -4,7 +4,7 @@
 
 var params = {
   policyAlpha     : 2.5,    // SM-alpha for action policy
-  questionerAlpha : 4,      // SM-alpha for question choice
+  questionerAlpha : 3,      // SM-alpha for question choice
   R1Alpha         : 3,      // SM-alpha for R1
   relevanceBetaR0 : 0,      // beta=1 for only action-utility
   relevanceBetaR1 : 0.95,   //

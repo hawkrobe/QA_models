@@ -116,7 +116,7 @@ var CCC_hiPri_AE = extend(
    decisionProblem: function(w, a) {
    return _.includes(w, 'AE') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_hiPri_MC = extend(
@@ -127,7 +127,7 @@ var CCC_hiPri_MC = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'MC') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_hiPri_CB = extend(
@@ -138,7 +138,7 @@ var CCC_hiPri_CB = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'CB') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_hiPri_AE_MC = extend(
@@ -149,7 +149,7 @@ var CCC_hiPri_AE_MC = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['AE','MC']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_hiPri_AE_CB = extend(
@@ -160,7 +160,7 @@ var CCC_hiPri_AE_CB = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['AE','CB']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_hiPri_MC_CB = extend(
@@ -171,7 +171,7 @@ var CCC_hiPri_MC_CB = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['MC','CB']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 
@@ -197,7 +197,7 @@ var CCC_loPri_AE = extend(
    decisionProblem: function(w, a) {
    return _.includes(w, 'AE') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_loPri_MC = extend(
@@ -208,7 +208,7 @@ var CCC_loPri_MC = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'MC') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_loPri_CB = extend(
@@ -219,7 +219,7 @@ var CCC_loPri_CB = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'CB') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_loPri_AE_MC = extend(
@@ -230,7 +230,7 @@ var CCC_loPri_AE_MC = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['AE','MC']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_loPri_AE_CB = extend(
@@ -241,7 +241,7 @@ var CCC_loPri_AE_CB = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['AE','CB']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_loPri_MC_CB = extend(
@@ -252,7 +252,7 @@ var CCC_loPri_MC_CB = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['MC','CB']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 
@@ -279,7 +279,7 @@ var CCC_medPri_AE = extend(
    decisionProblem: function(w, a) {
    return _.includes(w, 'AE') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_medPri_MC = extend(
@@ -290,7 +290,7 @@ var CCC_medPri_MC = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'MC') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_medPri_CB = extend(
@@ -301,7 +301,7 @@ var CCC_medPri_CB = extend(
     decisionProblem: function(w, a) {
     return _.includes(w, 'CB') ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_medPri_AE_MC = extend(
@@ -312,7 +312,7 @@ var CCC_medPri_AE_MC = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['AE','MC']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_medPri_AE_CB = extend(
@@ -323,7 +323,7 @@ var CCC_medPri_AE_CB = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['AE','CB']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 var CCC_medPri_MC_CB = extend(
@@ -334,7 +334,7 @@ var CCC_medPri_MC_CB = extend(
     decisionProblem: function(w, a) {
       return _.intersection(_.split(w, '+'), ['MC','CB']).length > 0 ?
       (a == 'go' ? 5 : 0) :
-      (a == 'go' ? -10 : 0);
+      (a == 'go' ? 0 : 5);
     }}
 )
 
@@ -348,5 +348,5 @@ var R1Prior_Uncertainty_medPior = {
   AE_MC: CCC_medPri_AE_MC,
   AE_CB: CCC_medPri_AE_CB,
   MC_CB: CCC_medPri_MC_CB,
-  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB"], ps: [6,4,1,5,3,2]})
+  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB"], ps: [8,4,1,5,3,2]})
 }
