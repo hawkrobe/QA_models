@@ -113,7 +113,7 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-#write_csv(priorPred, './03-current-models-webppl/data/prior_pred_full_matrix.csv')
+write_csv(priorPred, './03-current-models-webppl/data/prior_pred_full_matrix_constrained.csv')
 priorPred <- read_csv('prior_pred_full_matrix.csv')
 
 priorPredSummary <- priorPred %>% 
