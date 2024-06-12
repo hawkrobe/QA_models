@@ -129,65 +129,39 @@ var createContext = function(contextName, trueWorld, payoffVector, whichCCDoesR1
   return(newContext)
 }
 
-// highPrior contexts --------------
+var createPragmaticListenerPrior = function(trueWorld, payoffVector, prior) {
+  var CCC_AE       = createContext('CCC_' + trueWorld + '_AE'      , trueWorld, payoffVector, 'AE')
+  var CCC_MC       = createContext('CCC_' + trueWorld + '_MC'      , trueWorld, payoffVector, 'MC')
+  var CCC_CB       = createContext('CCC_' + trueWorld + '_CB'      , trueWorld, payoffVector, 'CB')
+  var CCC_AE_MC    = createContext('CCC_' + trueWorld + '_AE_MC'   , trueWorld, payoffVector, 'AE+MC')
+  var CCC_AE_CB    = createContext('CCC_' + trueWorld + '_AE_CB'   , trueWorld, payoffVector, 'AE+CB')
+  var CCC_MC_CB    = createContext('CCC_' + trueWorld + '_MC_CB'   , trueWorld, payoffVector, 'MC_CB')
+  var CCC_AE_MC_BC = createContext('CCC_' + trueWorld + '_AE_MC_CB', trueWorld, payoffVector, 'AE_MC_CB')
+  var CCC_nothing  = createContext('CCC_' + trueWorld + '_nothing ', trueWorld, payoffVector, 'nothing')
 
-var CCC_hiPri_AE       = createContext('CCC_hiPri_AE'      , 'AE+MC', [5,0,0,5], 'AE')
-var CCC_hiPri_MC       = createContext('CCC_hiPri_MC'      , 'AE+MC', [5,0,0,5], 'MC')
-var CCC_hiPri_CB       = createContext('CCC_hiPri_CB'      , 'AE+MC', [5,0,0,5], 'CB')
-var CCC_hiPri_AE_MC    = createContext('CCC_hiPri_AE_MC'   , 'AE+MC', [5,0,0,5], 'AE+MC')
-var CCC_hiPri_AE_CB    = createContext('CCC_hiPri_AE_CB'   , 'AE+MC', [5,0,0,5], 'AE+CB')
-var CCC_hiPri_MC_CB    = createContext('CCC_hiPri_MC_CB'   , 'AE+MC', [5,0,0,5], 'MC_CB')
-var CCC_hiPri_AE_MC_BC = createContext('CCC_hiPri_AE_MC_CB', 'AE+MC', [5,0,0,5], 'AE_MC_CB')
-
-var R1Prior_Uncertainty_highPior = {
-  AE          : CCC_hiPri_AE,
-  MC          : CCC_hiPri_MC,
-  CB          : CCC_hiPri_CB,
-  AE_MC       : CCC_hiPri_AE_MC,
-  AE_CB       : CCC_hiPri_AE_CB,
-  MC_CB       : CCC_hiPri_MC_CB,
-  AE_MC_CB    : CCC_hiPri_AE_MC_BC,
-  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB"], ps: [6,4,1,5,3,2,4]})
+  var R1Prior_Uncertainty = {
+    AE          : CCC_AE,
+    MC          : CCC_MC,
+    CB          : CCC_CB,
+    AE_MC       : CCC_AE_MC,
+    AE_CB       : CCC_AE_CB,
+    MC_CB       : CCC_MC_CB,
+    AE_MC_CB    : CCC_AE_MC_BC,
+    nothing     : CCC_nothing,
+    distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB","nothing"],
+                               ps: prior})
+  }
+  return(R1Prior_Uncertainty)
 }
+
+// Clark contexts --------------
+var R1Prior_Uncertainty_Clark = createPragmaticListenerPrior('CB', [5,0,0,5], [1,1,1,1,1,1,1,1])
+
+// highPrior contexts --------------
+var R1Prior_Uncertainty_highPior = createPragmaticListenerPrior('highPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
 
 // lowPrior contexts --------------
-
-var CCC_loPri_AE       = createContext('CCC_loPri_AE'      , 'MC+CB', [5,0,0,5], 'AE')
-var CCC_loPri_MC       = createContext('CCC_loPri_MC'      , 'MC+CB', [5,0,0,5], 'MC')
-var CCC_loPri_CB       = createContext('CCC_loPri_CB'      , 'MC+CB', [5,0,0,5], 'CB')
-var CCC_loPri_AE_MC    = createContext('CCC_loPri_AE_MC'   , 'MC+CB', [5,0,0,5], 'AE+MC')
-var CCC_loPri_AE_CB    = createContext('CCC_loPri_AE_CB'   , 'MC+CB', [5,0,0,5], 'AE+CB')
-var CCC_loPri_MC_CB    = createContext('CCC_loPri_MC_CB'   , 'MC+CB', [5,0,0,5], 'MC_CB')
-var CCC_loPri_AE_MC_BC = createContext('CCC_loPri_AE_MC_CB', 'MC+CB', [5,0,0,5], 'AE_MC_CB')
-
-var R1Prior_Uncertainty_lowPior = {
-  AE          : CCC_loPri_AE,
-  MC          : CCC_loPri_MC,
-  CB          : CCC_loPri_CB,
-  AE_MC       : CCC_loPri_AE_MC,
-  AE_CB       : CCC_loPri_AE_CB,
-  MC_CB       : CCC_loPri_MC_CB,
-  AE_MC_CB    : CCC_loPri_AE_MC_BC,
-  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB"], ps: [6,4,1,5,3,2,4]})
-}
+var R1Prior_Uncertainty_lowPior = createPragmaticListenerPrior('lowPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
 
 // medPrior contexts --------------
-
-var CCC_medPri_AE       = createContext('CCC_medPri_AE'      , 'AE+CB', [5,0,0,5], 'AE')
-var CCC_medPri_MC       = createContext('CCC_medPri_MC'      , 'AE+CB', [5,0,0,5], 'MC')
-var CCC_medPri_CB       = createContext('CCC_medPri_CB'      , 'AE+CB', [5,0,0,5], 'CB')
-var CCC_medPri_AE_MC    = createContext('CCC_medPri_AE_MC'   , 'AE+CB', [5,0,0,5], 'AE+MC')
-var CCC_medPri_AE_CB    = createContext('CCC_medPri_AE_CB'   , 'AE+CB', [5,0,0,5], 'AE+CB')
-var CCC_medPri_MC_CB    = createContext('CCC_medPri_MC_CB'   , 'AE+CB', [5,0,0,5], 'MC_CB')
-var CCC_medPri_AE_MC_BC = createContext('CCC_medPri_AE_MC_CB', 'AE+CB', [5,0,0,5], 'AE_MC_CB')
-
-var R1Prior_Uncertainty_medPior = {
-  AE          : CCC_medPri_AE,
-  MC          : CCC_medPri_MC,
-  CB          : CCC_medPri_CB,
-  AE_MC       : CCC_medPri_AE_MC,
-  AE_CB       : CCC_medPri_AE_CB,
-  MC_CB       : CCC_medPri_MC_CB,
-  AE_MC_CB    : CCC_medPri_AE_MC_BC,
-  distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB"], ps: [6,4,1,5,3,2,4]})
-}
+var R1Prior_Uncertainty_medPior = createPragmaticListenerPrior('medPri', [5,0,0,5], [6,4,1,5,3,2,4,1])

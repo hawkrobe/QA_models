@@ -4,11 +4,11 @@
 
 var params = {
   policyAlpha     : 2.5,    // SM-alpha for action policy
-  questionerAlpha : 4,      // SM-alpha for question choice
-  R1Alpha         : 3,      // SM-alpha for R1
+  questionerAlpha : 6,      // SM-alpha for question choice
+  R1Alpha         : 5,      // SM-alpha for R1
   relevanceBetaR0 : 0,      // beta=1 for only action-utility
-  relevanceBetaR1 : 0.95,   //
-  costWeight      : 0.25,
+  relevanceBetaR1 : 0.1,   //
+  costWeight      : 0.5,
   questionCost    : 0.25    // cost for a question (relative to no question)
 };
 
@@ -90,97 +90,169 @@ var params = {
 // ---------------------------------------------
 
 
-
-// CASE 1 -------------------------------------
-
-var question_1 = creditCardContext.questions[6];
+// Clark's basic observation -------------------------------------
 
 console.log(" ---------------------------------------------------------\n",
-            "        Case 1 (highPrior: AE and MC available)    \n",
+            " Clark's basic case (AE? available?; all CCs eq. likely)\n",
             "---------------------------------------------------------\n")
 
-console.log('question: \t', question_1.text)
-
-var R1posterior = R1ContextPosterior(creditCardContext, question_1, R1Prior_Uncertainty_highPior, params);
-console.log("Posterior beliefs about which CC Questioner has:")
-terminalViz(marginalize(R1posterior, 'label'),4)
-
-var R1Prediction = R1Averager(creditCardContext, R1Prior_Uncertainty_highPior, question_1, params)
-console.log("Probability of answers:")
-terminalViz(R1Prediction,4)
-
-console.log("\n")
-
-console.log(" ---------------------------------------------------------\n",
-            "        Case 1 (lowPrior: MC and CB available)    \n",
-            "---------------------------------------------------------\n")
-
-console.log('question: \t', question_1.text)
-
-var R1posterior = R1ContextPosterior(CCC_loPri_AE, question_1, R1Prior_Uncertainty_lowPior, params);
-console.log("Posterior beliefs about which CC Questioner has:")
-terminalViz(marginalize(R1posterior, 'label'),4)
-
-var R1Prediction = R1Averager(CCC_loPri_AE, R1Prior_Uncertainty_lowPior, question_1, params)
-console.log("Probability of answers:")
-terminalViz(R1Prediction,4)
-
-console.log("\n")
+var trueWorlds = ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB"]
 
 
-// CASE 2 -------------------------------------
+var getAnswerTypeDistribution = function(question) {
 
-console.log(" ---------------------------------------------------------\n",
-            "        Case 2 (highPrior: AE and MC available)    \n",
-            "---------------------------------------------------------\n")
+  var answerTypeDist = Infer({method: 'enumerate'}, function(){
+    var trueWorld = uniformDraw(trueWorlds)
+    // console.log(question.text)
+    if (question.text == "AE?") {
+      condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length > 0)
+    }
+    var R1Prediction = R1Averager(
+      extend(creditCardContext,
+             {R0PriorOverWorlds: Delta({v: trueWorld}),
+              R1PriorOverWorlds: Delta({v: trueWorld}),
+             }),
+      createPragmaticListenerPrior(trueWorld, [5,0,0,5], [1,1,1,1,1,1,1,1]),
+      question,
+      params)
+    var answerType = categorical(
+      {vs: ["fullAnswer", "other"],
+       ps: [Math.exp(R1Prediction.score('yes.'+trueWorld)),
+            1-Math.exp(R1Prediction.score('yes.'+trueWorld))]})
+    return answerType
+  })
 
-var question_2 = creditCardContext.questions[1];
+  return(answerTypeDist)
 
-console.log('question: \t', question_2.text)
+}
 
-var R1posterior = R1ContextPosterior(creditCardContext, question_2, R1Prior_Uncertainty_highPior, params);
-console.log("Posterior beliefs about which CC Questioner has:")
-terminalViz(marginalize(R1posterior, 'label'),4)
+console.log('question: \t', creditCardContext.questions[6].text)
+var answerTypeDist_any = getAnswerTypeDistribution(creditCardContext.questions[6])
+terminalViz(answerTypeDist_any,4)
 
-var R1Prediction = R1Averager(creditCardContext, R1Prior_Uncertainty_highPior, question_2, params)
-console.log("Probability of answers:")
-terminalViz(R1Prediction,4)
-
-
-
-console.log("\n")
-
-console.log(" ---------------------------------------------------------\n",
-            "        Case 2 (lowPrior: MC and CB available)    \n",
-            "---------------------------------------------------------\n")
-
-console.log('question: \t', question_2.text)
-
-var R1posterior = R1ContextPosterior(CCC_loPri_AE, question_2, R1Prior_Uncertainty_lowPior, params);
-console.log("Posterior beliefs about which CC Questioner has:")
-terminalViz(marginalize(R1posterior, 'label'),4)
-
-var R1Prediction = R1Averager(CCC_loPri_AE, R1Prior_Uncertainty_lowPior, question_2, params)
-console.log("Probability of answers:")
-terminalViz(R1Prediction,4)
-
-console.log("\n")
+console.log('question: \t', creditCardContext.questions[0].text)
+var answerTypeDist_AE = getAnswerTypeDistribution(creditCardContext.questions[0])
+terminalViz(answerTypeDist_AE,4)
 
 
-// CASE 3 -------------------------------------
+// console.log("\n")
 
-console.log(" ---------------------------------------------------------\n",
-            "        Case 3 (medPrior: AE and CB available)    \n",
-            "---------------------------------------------------------\n")
 
-var question_3 = creditCardContext.questions[1];
+// // CASE 1 -------------------------------------
 
-console.log('question: \t', question_3.text)
+// var question_1 = creditCardContext.questions[6];
 
-var R1posterior = R1ContextPosterior(CCC_medPri_MC, question_3, R1Prior_Uncertainty_medPior, params);
-console.log("Posterior beliefs about which CC Questioner has:")
-terminalViz(marginalize(R1posterior, 'label'),4)
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 1 (highPrior: AE and MC available)    \n",
+//             "---------------------------------------------------------\n")
 
-var R1Prediction = R1Averager(CCC_medPri_AE, R1Prior_Uncertainty_medPior, question_3, params)
-console.log("Probability of answers:")
-terminalViz(R1Prediction,4)
+// console.log('question: \t', question_1.text)
+
+// var R1posterior = R1ContextPosterior(creditCardContext, question_1, R1Prior_Uncertainty_highPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(creditCardContext, R1Prior_Uncertainty_highPior, question_1, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+// console.log("\n")
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 1 (lowPrior: MC and CB available)    \n",
+//             "---------------------------------------------------------\n")
+
+// console.log('question: \t', question_1.text)
+
+// var trueWorld = "MC+CB";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+// var R1posterior = R1ContextPosterior(contextModel, question_1, R1Prior_Uncertainty_lowPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_lowPior, question_1, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+
+// console.log("\n")
+
+// // CASE 2 -------------------------------------
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 2 (highPrior: AE and MC available)    \n",
+//             "---------------------------------------------------------\n")
+
+// var question_2 = creditCardContext.questions[1];
+
+// console.log('question: \t', question_2.text)
+
+// var trueWorld = "AE+MC";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+// var R1posterior = R1ContextPosterior(contextModel, question_2, R1Prior_Uncertainty_highPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_highPior, question_2, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+
+
+// console.log("\n")
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 2 (lowPrior: MC and CB available)    \n",
+//             "---------------------------------------------------------\n")
+
+// console.log('question: \t', question_2.text)
+
+// var trueWorld = "MC+CB";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+// var R1posterior = R1ContextPosterior(contextModel, question_2, R1Prior_Uncertainty_lowPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_lowPior, question_2, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+// console.log("\n")
+
+
+// // CASE 3 -------------------------------------
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 3 (medPrior: AE and CB available)    \n",
+//             "---------------------------------------------------------\n")
+
+// var question_3 = creditCardContext.questions[1];
+
+// console.log('question: \t', question_3.text)
+
+// var trueWorld = "AE+CB";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+
+// var R1posterior = R1ContextPosterior(contextModel, question_3, R1Prior_Uncertainty_medPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_medPior, question_3, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
