@@ -68,13 +68,13 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 1, max = 3), #3
-    'questionerAlpha'  = runif(1,min = 1, max = 2), #1-2
+    'policyAlpha'      = runif(1,min = 1, max = 5), #3
+    'questionerAlpha'  = runif(1,min = 1, max = 3), #1-2
     'R1Alpha'          = runif(1,min = 1, max = 2), #1-2
-    'relevanceBetaR0'  = 0,
-    'relevanceBetaR1'  = runif(1,min = 0.97, max = 0.99), #0.95-0.97
-    'costWeight'       = runif(1,min = 0.4, max = 0.6), #0.5
-    'questionCost'     = runif(1,min = 0, max = 0.3) #0.2
+    'relevanceBetaR0'  = runif(1,min = 0, max = 1),
+    'relevanceBetaR1'  = runif(1,min = 0.94, max = 0.99), #0.95-0.97
+    'costWeight'       = runif(1,min = 0.3, max = 0.7), #0.5
+    'questionCost'     = runif(1,min = 0, max = 0.5) #0.2
   )
   return(params)
 }
@@ -113,7 +113,7 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-write_csv(priorPred, './03-current-models-webppl/data/prior_pred_full_matrix_constrained.csv')
+write_csv(priorPred, './03-current-models-webppl/data/prior_pred_full_matrix.csv')
 priorPred <- read_csv('prior_pred_full_matrix.csv')
 
 priorPredSummary <- priorPred %>% 
