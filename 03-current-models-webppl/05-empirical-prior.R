@@ -69,11 +69,11 @@ run_model_tso <- function (params, utils) {
 priorSampleParams <- function() {
   params <- tibble(
     'policyAlpha'      = runif(1,min = 1, max = 5), #3
-    'questionerAlpha'  = runif(1,min = 1, max = 3), #1-2
+    'questionerAlpha'  = runif(1,min = 0, max = 3), #1-2
     'R1Alpha'          = runif(1,min = 1, max = 2), #1-2
     'relevanceBetaR0'  = runif(1,min = 0, max = 1),
     'relevanceBetaR1'  = runif(1,min = 0.94, max = 0.99), #0.95-0.97
-    'costWeight'       = runif(1,min = 0.3, max = 0.7), #0.5
+    'costWeight'       = runif(1,min = 0.5, max = 1), #0.5
     'questionCost'     = runif(1,min = 0, max = 0.5) #0.2
   )
   return(params)
