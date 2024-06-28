@@ -10,6 +10,8 @@ library(tidyverse)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 library(readr)
 library(furrr)
+library(here)
+
 
 # use the aida-theme for plotting
 theme_set(theme_aida())
@@ -48,7 +50,7 @@ full_matrix <- full_matrix_data %>%
 full_matrix %>%
   count(itemName, targetOption)
 
-priorPred <- read_csv('./03-current-models-webppl/data/prior_pred_full_matrix.csv')
+priorPred <- read_csv(here('03-current-models-webppl/data/prior_pred_full_matrix.csv'))
 ```
 
 ```{r plot}
@@ -84,9 +86,11 @@ empirical_recoded %>%
   geom_col() +
   theme(legend.position = 'none') +
   xlab('answer type') +
-  ylab('mean prior predictive') + 
+  ylab('prop answer') + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
 
+```{r}
 priorpred_recoded <- priorPredSummary %>% 
   dplyr::mutate(
     answerType = dplyr::case_when(
@@ -105,7 +109,7 @@ priorpred_recoded %>%
   #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
   theme(legend.position = 'none') +
   xlab('answer type') +
-  ylab('mean prior predictive') + 
+  ylab('prop') + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 priorpred_recoded %>%
@@ -159,7 +163,10 @@ all_obs <- priorPred %>%
             by = c("scenario", "answerType")) %>%
   mutate(human_mean = if_else(is.na(human_mean), 0, human_mean)) %>%
   mutate(error = abs(prob - human_mean))
+```
 
+
+```{r}
 all_obs %>%
   ggplot(aes(x = questionCost, y = error)) +
   geom_smooth()
@@ -181,10 +188,19 @@ all_obs %>%
   geom_smooth()
 
 all_obs %>%
-  ggplot(aes(x = costWeight, y = diff)) +
+  ggplot(aes(x = costWeight, y = error)) +
   geom_smooth()
 
-all_obs %>%
-  ggplot(aes(x = questionCost, y = diff)) +
-  geom_smooth()
+```
+
+
+```{r}
+priors %>%
+  mutate(received_option = factor(received_option, levels = c("target", 
+                                                              "competitor", "sameCategory", "otherCategory"))) %>%
+  filter(requested_option == "target") %>%
+  ggplot(aes(x = received_option, fill = received_option, y = mean_response)) +
+  geom_col() +
+  facet_wrap(~itemName)  + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
