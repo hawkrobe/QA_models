@@ -1,0 +1,152 @@
+//////////////////////////////////////////////////
+// output for R script
+//////////////////////////////////////////////////
+
+// function to call when using RwebPPL
+var makeR = function(){
+
+ // console.log("Starting task: ", RInput[0].task)
+ // console.log("R1Input", RInput)
+  if (RInput[0].task == "TSO") {
+    // target-same-other setting (1st pilot)
+
+    var params =
+      {
+        policyAlpha     : RInput[0].policyAlpha,
+        questionerAlpha : RInput[0].questionerAlpha,
+        R1Alpha         : RInput[0].R1Alpha,
+        relevanceBetaR0 : RInput[0].relevanceBetaR0,  // beta=1 for only action-utility
+        relevanceBetaR1 : RInput[0].relevanceBetaR1,   //
+        costWeight      : RInput[0].costWeight,
+        questionCost    : RInput[0].questionCost      // cost for a question (relative to no question)
+      }
+
+    var contextLocal = extend(
+      tsoContext,
+      {decisionProblem : function(w, a) {
+        return _.includes(w, a) ?
+          (a == 'target' ? RInput[0].utilTarget :
+           a == 'competitor' ? RInput[0].utilCompetitor :
+           a == 'sameCat' ? RInput[0].utilSameCat : RInput[0].utilOtherCat) :
+          0.0000001;
+      }}
+    )
+
+    var question = contextLocal.questions[0];
+
+
+    // R1 knows full context model
+    var R1Prior = {
+      trueWorld: contextLocal,
+      distribution: Categorical({vs: ["trueWorld"]})
+    }
+
+    var R1Prediction = R1Averager(contextLocal, R1Prior, question, params)
+
+    
+    
+    var R1PredictionReduced = Infer({
+      method: 'enumerate'},
+      function() {
+        var response = sample(R1Prediction);
+        var match = response == 'no.---' ? true :
+            response == 'no.competitor' ? true :
+            response == 'no.competitor+sameCat' ? true :
+            response == 'no.otherCat' ? true :
+            response == 'no.competitor+sameCat+otherCat' ? true : false
+        condition(match)
+        return(response)
+      })
+    // console.log("R1-Averager:")
+    // terminalViz(R1PredictionReduced,4)
+
+    return(R1PredictionReduced)
+  }
+
+  if (RInput[0].task == "continuousInference") {
+    // two-parameter continuous inference of preferences
+    var cI = getContInf()
+    console.log("CI")
+    return cI
+  }
+
+  if (RInput[0].task == "safeAnswererNegative") {
+    // R0 (safe answerer) giving a negative response to disjunctive question
+    var context = pieCakeContextUnbiasedNoPref // neutral context
+    var question = context.questions[7]; // anything w/ raspberry?
+    var world = setsOfBakedGoods[11];     // RP+LC
+    console.log("Context: " , context.name)
+    console.log("Question: " , question.text)
+    console.log("World: " , world)
+    var context_extended = extend(context, {
+      R0PriorOverWorlds: Delta({v: world}),
+      R1PriorOverWorlds: Delta({v: world}),
+    });
+    var R0test = R0( question,  context_extended, params )
+    terminalViz(R0test)
+    return R0test
+  }
+
+  if (RInput[0].task == "safeAnswererPositive") {
+    // R0 (safe answerer) giving a positive response to disjunctive question
+    var context = pieCakeContextUnbiasedNoPref // neutral context
+    var question = context.questions[8]; // anything w/ raspberry?
+    var world = setsOfBakedGoods[9];     // RP+LC
+    console.log("Context: " , context.name)
+    console.log("Question: " , question)
+    console.log("World: " , world)
+    var context_extended = extend(context, {
+      R0PriorOverWorlds: Delta({v: world}),
+      R1PriorOverWorlds: Delta({v: world}),
+    });
+    var R0test = R0( question,  context_extended, params )
+    terminalViz(R0test)
+    return R0test
+  }
+
+  if (RInput[0].task == "R1Responses_BinaryPrefs") {
+    // R1 (averager) response selection
+    var context = pieCakeContextUnbiasedNoPref // neutral context
+    var question = context.questions[2]; // RP?
+    var world = setsOfBakedGoods[9];     // RP+LC
+    var context_extended = extend(context, {
+      R0PriorOverWorlds: Delta({v: world}),
+      R1PriorOverWorlds: Delta({v: world}),
+    });
+    return R1Averager(
+      context_extended,
+      R1PriorContext_BinaryPrefs,
+      question,
+      params)
+  }
+  if (RInput[0].task == "R1Posterior_BinaryPrefs") {
+    // R1 posterior over contexts for binary preference inference
+    var context = pieCakeContextUnbiasedNoPref // neutral context
+    var question = context.questions[2]; // RP?
+    var world = setsOfBakedGoods[9];     // RP+LC
+    var context_extended = extend(context, {
+      R0PriorOverWorlds: Delta({v: world}),
+      R1PriorOverWorlds: Delta({v: world}),
+    });
+    return marginalize(R1ContextPosterior(
+      context,
+      question,
+      R1PriorContext_BinaryPrefs,
+      params
+    ), 'label');
+  }
+  else {
+    var context =
+    RInput[0].task == 'pieCakeContextMinimal' ? pieCakeContextMinimal :
+    RInput[0].task == 'pieCakeContextMinimalWithPreferences' ? pieCakeContextMinimalWithPreferences :
+    RInput[0].task == 'pieCakeContext' ? pieCakeContext :
+    RInput[0].task == 'pieCakeContextAdditivePreferences' ? pieCakeContextAdditivePreferences :
+    RInput[0].task == 'pieCakeContextBiasedNoPref' ? pieCakeContextBiasedNoPref :
+    RInput[0].task == 'pieCakeContextUnbiasedNoPref' ? pieCakeContextUnbiasedNoPref :
+    RInput[0].task == 'pieCakeContextBiasedPessimist' ? pieCakeContextBiasedPessimist :
+        false
+    Q1(context, params)
+  }
+}
+
+makeR()
