@@ -4,14 +4,15 @@
 
 var params = {
   policyAlpha     : 2.5,    // SM-alpha for action policy
-  questionerAlpha : 6,      // SM-alpha for question choice
+  questionerAlpha : 1.5,      // SM-alpha for question choice
   R1Alpha         : 5,      // SM-alpha for R1
   relevanceBetaR0 : 0,      // beta=1 for only action-utility
-  relevanceBetaR1 : 0.1,   //
-  costWeight      : 0.5,
-  questionCost    : 0.25    // cost for a question (relative to no question)
+  relevanceBetaR1 : 0.9,   //
+  costWeight      : 0.3,
+  questionCost    : 0    // cost for a question (relative to no question)
 };
 
+console.log(params)
 
 //  ------------------
 // | test CC example |
@@ -96,17 +97,14 @@ console.log(" ---------------------------------------------------------\n",
             " Clark's basic case (AE? available?; all CCs eq. likely)\n",
             "---------------------------------------------------------\n")
 
-var trueWorlds = ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB"]
+var trueWorlds = ["AE", "MC", "CB", "AE+MC", "AE+CB", "MC+CB", "AE+MC+CB"]
 
 
-var getAnswerTypeDistribution = function(question) {
+var getAnswerTypeDistribution = function(question, cond) {
 
   var answerTypeDist = Infer({method: 'enumerate'}, function(){
     var trueWorld = uniformDraw(trueWorlds)
-    // console.log(question.text)
-    if (question.text == "AE?") {
-      condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length > 0)
-    }
+    // console.log('trueWorld: \t', trueWorld)
     var R1Prediction = R1Averager(
       extend(creditCardContext,
              {R0PriorOverWorlds: Delta({v: trueWorld}),
@@ -115,10 +113,25 @@ var getAnswerTypeDistribution = function(question) {
       createPragmaticListenerPrior(trueWorld, [5,0,0,5], [1,1,1,1,1,1,1,1]),
       question,
       params)
+    // console.log(question.text)
+    if (question.text == "AE?") {
+      if (cond == "no") {
+        condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length == 0)
+      }
+      if (cond == "yes") {
+        condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length > 0)
+      }
+    }
+    var probabilitiesNo  = [Math.exp(R1Prediction.score('no.'+trueWorld)),
+                            1-Math.exp(R1Prediction.score('no.'+trueWorld))]
+    var probabilitiesYes =  [Math.exp(R1Prediction.score('yes.'+trueWorld)),
+                            1-Math.exp(R1Prediction.score('yes.'+trueWorld))]
+    var probabilities = question.text == "AE?" && cond == "no" ?
+        probabilitiesNo : probabilitiesYes
     var answerType = categorical(
-      {vs: ["fullAnswer", "other"],
-       ps: [Math.exp(R1Prediction.score('yes.'+trueWorld)),
-            1-Math.exp(R1Prediction.score('yes.'+trueWorld))]})
+          {vs: ["fullAnswer", "other"],
+           ps: probabilities})
+
     return answerType
   })
 
@@ -130,9 +143,15 @@ console.log('question: \t', creditCardContext.questions[6].text)
 var answerTypeDist_any = getAnswerTypeDistribution(creditCardContext.questions[6])
 terminalViz(answerTypeDist_any,4)
 
-console.log('question: \t', creditCardContext.questions[0].text)
-var answerTypeDist_AE = getAnswerTypeDistribution(creditCardContext.questions[0])
+console.log('question: \t', creditCardContext.questions[0].text, '\t condition: \tAE not available')
+var answerTypeDist_AE = getAnswerTypeDistribution(creditCardContext.questions[0], "no")
 terminalViz(answerTypeDist_AE,4)
+
+console.log('question: \t', creditCardContext.questions[0].text, '\t condition: \tAE available')
+var answerTypeDist_AE = getAnswerTypeDistribution(creditCardContext.questions[0], "yes")
+terminalViz(answerTypeDist_AE,4)
+
+
 
 
 // console.log("\n")

@@ -113,31 +113,59 @@ var creditCardContext = {
 // payoffVector      : LST (reals) | payoffs in row-first forma    | [1,0,0,1]
 // whichCCDoesR1Have : STR         | which cards the customer has  | "MC+CB"
 
-var createContext = function(contextName, trueWorld, payoffVector, whichCCDoesR1Have) {
+var createContext = function(contextName, trueWorld, DPType, whichCCDoesR1Have) {
+
+  var payoffVector = [5,0,0,5]
+
+  var DPOverlap = function(w, a) {
+    return _.intersection(_.split(w, '+'), _.split(whichCCDoesR1Have, '+')).length > 0 && w != 'nothing' ?
+      (a == 'go' ? payoffVector[0] : payoffVector[1]) :
+      (a == 'go' ? payoffVector[2] : payoffVector[3]);
+      }
+
+  var DPAny = function(w, a) {
+    return w != 'nothing' ?
+      (a == 'go' ? payoffVector[0] : payoffVector[1]) :
+      (a == 'go' ? payoffVector[2] : payoffVector[3]);
+  }
+
+  var DP = DPType == 'DPOverlap' ?  DPOverlap : DPAny
+
   var newContext = extend(
     creditCardContext,
     {
       name: contextName,
       R0PriorOverWorlds: Delta({v: trueWorld}),
       R1PriorOverWorlds: Delta({v: trueWorld}),
-      decisionProblem: function(w, a) {
-        return _.intersection(_.split(w, '+'), _.split(whichCCDoesR1Have, '+')).length > 0 ?
-        (a == 'go' ? payoffVector[0] : payoffVector[1]) :
-        (a == 'go' ? payoffVector[2] : payoffVector[3]);
-      }}
+      decisionProblem: DP
+    }
   )
   return(newContext)
 }
 
-var createPragmaticListenerPrior = function(trueWorld, payoffVector, prior) {
-  var CCC_AE       = createContext('CCC_' + trueWorld + '_AE'      , trueWorld, payoffVector, 'AE')
-  var CCC_MC       = createContext('CCC_' + trueWorld + '_MC'      , trueWorld, payoffVector, 'MC')
-  var CCC_CB       = createContext('CCC_' + trueWorld + '_CB'      , trueWorld, payoffVector, 'CB')
-  var CCC_AE_MC    = createContext('CCC_' + trueWorld + '_AE_MC'   , trueWorld, payoffVector, 'AE+MC')
-  var CCC_AE_CB    = createContext('CCC_' + trueWorld + '_AE_CB'   , trueWorld, payoffVector, 'AE+CB')
-  var CCC_MC_CB    = createContext('CCC_' + trueWorld + '_MC_CB'   , trueWorld, payoffVector, 'MC_CB')
-  var CCC_AE_MC_BC = createContext('CCC_' + trueWorld + '_AE_MC_CB', trueWorld, payoffVector, 'AE_MC_CB')
-  var CCC_nothing  = createContext('CCC_' + trueWorld + '_nothing ', trueWorld, payoffVector, 'nothing')
+var createPragmaticListenerPrior = function(trueWorld) {
+
+  // three types of decision problems
+  // 1. DPOverlap: whether the restaurant accepts a card that the questioner has
+  // 2. DPAny: whether restaurant accepts any card at all
+
+  var CCC_AE       = createContext('CCC_' + trueWorld + '_AE'      , trueWorld, "DPOverlap", 'AE')
+  var CCC_MC       = createContext('CCC_' + trueWorld + '_MC'      , trueWorld, "DPOverlap", 'MC')
+  var CCC_CB       = createContext('CCC_' + trueWorld + '_CB'      , trueWorld, "DPOverlap", 'CB')
+  var CCC_AE_MC    = createContext('CCC_' + trueWorld + '_AE_MC'   , trueWorld, "DPOverlap", 'AE+MC')
+  var CCC_AE_CB    = createContext('CCC_' + trueWorld + '_AE_CB'   , trueWorld, "DPOverlap", 'AE+CB')
+  var CCC_MC_CB    = createContext('CCC_' + trueWorld + '_MC_CB'   , trueWorld, "DPOverlap", 'MC+CB')
+  var CCC_AE_MC_BC = createContext('CCC_' + trueWorld + '_AE_MC_CB', trueWorld, "DPOverlap", 'AE+MC+CB')
+  var CCC_nothing  = createContext('CCC_' + trueWorld + '_nothing ', trueWorld, "DPOverlap", 'nothing')
+
+  var CCC_AE_any       = createContext('CCC_' + trueWorld + '_AE'      , trueWorld, "DPAny", 'AE')
+  var CCC_MC_any       = createContext('CCC_' + trueWorld + '_MC'      , trueWorld, "DPAny", 'MC')
+  var CCC_CB_any       = createContext('CCC_' + trueWorld + '_CB'      , trueWorld, "DPAny", 'CB')
+  var CCC_AE_MC_any    = createContext('CCC_' + trueWorld + '_AE_MC'   , trueWorld, "DPAny", 'AE+MC')
+  var CCC_AE_CB_any    = createContext('CCC_' + trueWorld + '_AE_CB'   , trueWorld, "DPAny", 'AE+CB')
+  var CCC_MC_CB_any    = createContext('CCC_' + trueWorld + '_MC_CB'   , trueWorld, "DPAny", 'MC+CB')
+  var CCC_AE_MC_BC_any = createContext('CCC_' + trueWorld + '_AE_MC_CB', trueWorld, "DPAny", 'AE+MC+CB')
+  var CCC_nothing_any  = createContext('CCC_' + trueWorld + '_nothing ', trueWorld, "DPAny", 'nothing')
 
   var R1Prior_Uncertainty = {
     AE          : CCC_AE,
@@ -148,20 +176,29 @@ var createPragmaticListenerPrior = function(trueWorld, payoffVector, prior) {
     MC_CB       : CCC_MC_CB,
     AE_MC_CB    : CCC_AE_MC_BC,
     nothing     : CCC_nothing,
-    distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB","nothing"],
-                               ps: prior})
+    AE_any          : CCC_AE_any,
+    MC_any          : CCC_MC_any,
+    CB_any          : CCC_CB_any,
+    AE_MC_any       : CCC_AE_MC_any,
+    AE_CB_any       : CCC_AE_CB_any,
+    MC_CB_any       : CCC_MC_CB_any,
+    AE_MC_CB_any    : CCC_AE_MC_BC_any,
+    nothing_any     : CCC_nothing_any,
+    distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB","nothing",
+                                    "AE_any", "MC_any", "CB_any", "AE_MC_any", "AE_CB_any", "MC_CB_any", "AE_MC_CB_any","nothing_any"],
+                               ps: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]})
   }
   return(R1Prior_Uncertainty)
 }
 
 // Clark contexts --------------
-var R1Prior_Uncertainty_Clark = createPragmaticListenerPrior('CB', [5,0,0,5], [1,1,1,1,1,1,1,1])
+// var R1Prior_Uncertainty_Clark = createPragmaticListenerPrior('CB', [5,0,0,5], [1,1,1,1,1,1,1,1])
 
-// highPrior contexts --------------
-var R1Prior_Uncertainty_highPior = createPragmaticListenerPrior('highPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
+// // highPrior contexts --------------
+// var R1Prior_Uncertainty_highPior = createPragmaticListenerPrior('highPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
 
-// lowPrior contexts --------------
-var R1Prior_Uncertainty_lowPior = createPragmaticListenerPrior('lowPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
+// // lowPrior contexts --------------
+// var R1Prior_Uncertainty_lowPior = createPragmaticListenerPrior('lowPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
 
-// medPrior contexts --------------
-var R1Prior_Uncertainty_medPior = createPragmaticListenerPrior('medPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
+// // medPrior contexts --------------
+// var R1Prior_Uncertainty_medPior = createPragmaticListenerPrior('medPri', [5,0,0,5], [6,4,1,5,3,2,4,1])
