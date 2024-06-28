@@ -64,16 +64,15 @@ priorSampleParams <- function() {
 
 empiricalPrior <- function(scenario) {
   these_priors <- priors %>% 
-    mutate(targetOption = fct_relevel(targetOption, 'itemQuestion', 'mostSimilar', 'sameCategory', 'otherCategory')) %>%
-    group_by(targetOption) %>%
     filter(itemName == scenario) %>%
     sample_n(1)
     
   utils <- tibble(
     'utilTarget'       = these_priors$itemQuestion,
-    'utilCompetitor'   = these_priors$mostSimilar,
+    'utilCompetitor'   = these_priors$competitor,
     'utilSameCat'      = these_priors$sameCategory,
-    'utilOtherCat'     = these_priors$otherCategory
+    'utilOtherCat'     = these_priors$otherCategory,
+    'utilMostSimilar'     = these_priors$mostSimilar
   )
   return(utils)
 }
@@ -95,3 +94,5 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
     cbind(run_model_tso(params, utils))
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
+
+write_csv(priorPred, './03-current-models-webppl/data/multicontext_empirical.csv')

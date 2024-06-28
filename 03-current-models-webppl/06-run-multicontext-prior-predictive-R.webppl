@@ -27,6 +27,7 @@ var makeR = function(){
         return _.includes(w, a) ?
           (a == 'target' ? RInput[0].utilTarget :
            a == 'competitor' ? RInput[0].utilCompetitor :
+           a == 'mostSimilar' ? RInput[0].utilMostSimilar :
            a == 'sameCat' ? RInput[0].utilSameCat : RInput[0].utilOtherCat) :
           0.0000001;
       }}
@@ -53,7 +54,8 @@ var makeR = function(){
             response == 'no.competitor' ? true :
             response == 'no.competitor+sameCat' ? true :
             response == 'no.otherCat' ? true :
-            response == 'no.competitor+sameCat+otherCat' ? true : false
+            response == 'no.mostSimilar' ? true :
+            response == 'no.competitor+sameCat+otherCat+mostSimilar' ? true : false
         condition(match)
         return(response)
       })
