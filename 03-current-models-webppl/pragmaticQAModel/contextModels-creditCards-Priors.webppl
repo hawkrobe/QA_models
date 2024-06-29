@@ -184,8 +184,8 @@ var createPragmaticListenerPrior = function(trueWorld) {
     MC_CB_any       : CCC_MC_CB_any,
     AE_MC_CB_any    : CCC_AE_MC_BC_any,
     nothing_any     : CCC_nothing_any,
-    distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB","nothing",
-                                    "AE_any", "MC_any", "CB_any", "AE_MC_any", "AE_CB_any", "MC_CB_any", "AE_MC_CB_any","nothing_any"],
+    distribution: Categorical({vs: ["AE", "MC", "CB", "AE_MC", "AE_CB", "MC_CB", "AE_MC_CB", "nothing",
+                                    "AE_any", "MC_any", "CB_any", "AE_MC_any", "AE_CB_any", "MC_CB_any", "AE_MC_CB_any", "nothing_any"],
                                ps: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]})
   }
   return(R1Prior_Uncertainty)

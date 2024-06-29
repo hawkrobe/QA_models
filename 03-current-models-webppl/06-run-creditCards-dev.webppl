@@ -12,6 +12,16 @@ var params = {
   questionCost    : 0    // cost for a question (relative to no question)
 };
 
+// var params = {
+//   policyAlpha     : 2.5,    // SM-alpha for action policy
+//   questionerAlpha : 1,      // SM-alpha for question choice
+//   R1Alpha         : 4,      // SM-alpha for R1
+//   relevanceBetaR0 : 0,      // beta=1 for only action-utility
+//   relevanceBetaR1 : 0.95,   //
+//   costWeight      : 0.2,
+//   questionCost    : 0    // cost for a question (relative to no question)
+// };
+
 console.log(params)
 
 //  ------------------
@@ -19,7 +29,7 @@ console.log(params)
 //  ------------------
 
 
-// var context = CCC_medPri_MC ;
+// var context = creditCardContext ;
 // console.log('context: \t', context.name);
 
 // var worlds = context.worlds;
@@ -43,7 +53,6 @@ console.log(params)
 // var responsesR1 = context.getLicensedResponsesR1
 // console.log('R1 resp. set \t: ', responsesR1(question))
 
-
 // var responseR1 = responsesR1(question)[0]
 // console.log('response R1: \t', responseR1)
 
@@ -62,6 +71,43 @@ console.log(params)
 // var R0Ext_test = R1ContextFree(question, context, params)
 // console.log("R0 (extended):")
 // terminalViz(R0Ext_test, 4)
+
+// var trueWorlds = ["AE", "MC", "CB", "AE+MC", "AE+CB", "MC+CB", "AE+MC+CB"]
+
+// show detailed responses of R1 for every world state (what the restaurant has)
+
+// map(function(trueWorld) {
+
+//     console.log("---\ntrueWorld: \t", trueWorld)
+
+//     var R1posterior = R1ContextPosterior(
+//         extend(creditCardContext,
+//                {R0PriorOverWorlds: Delta({v: trueWorld}),
+//                 R1PriorOverWorlds: Delta({v: trueWorld}),
+//                }),
+//         question,
+//         createPragmaticListenerPrior(trueWorld),
+//         params)
+
+
+//     console.log("Posterior beliefs about which CC Questioner has:")
+//     terminalViz(marginalize(R1posterior, 'label'),4)
+
+
+//     var R1Prediction = R1Averager(
+//         extend(creditCardContext,
+//                {R0PriorOverWorlds: Delta({v: trueWorld}),
+//                 R1PriorOverWorlds: Delta({v: trueWorld}),
+//                }),
+//         createPragmaticListenerPrior(trueWorld),
+//         question,
+//         params)
+
+//     console.log("R1 (Averager):")
+//     terminalViz(R1Prediction, 4)
+
+// }, trueWorlds)
+
 
 // ---------------------------------------------
 // testing R1 with full knowledge of preferences
@@ -110,7 +156,7 @@ var getAnswerTypeDistribution = function(question, cond) {
              {R0PriorOverWorlds: Delta({v: trueWorld}),
               R1PriorOverWorlds: Delta({v: trueWorld}),
              }),
-      createPragmaticListenerPrior(trueWorld, [5,0,0,5], [1,1,1,1,1,1,1,1]),
+      createPragmaticListenerPrior(trueWorld),
       question,
       params)
     // console.log(question.text)
@@ -122,14 +168,37 @@ var getAnswerTypeDistribution = function(question, cond) {
         condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length > 0)
       }
     }
-    var probabilitiesNo  = [Math.exp(R1Prediction.score('no.'+trueWorld)),
-                            1-Math.exp(R1Prediction.score('no.'+trueWorld))]
-    var probabilitiesYes =  [Math.exp(R1Prediction.score('yes.'+trueWorld)),
-                            1-Math.exp(R1Prediction.score('yes.'+trueWorld))]
-    var probabilities = question.text == "AE?" && cond == "no" ?
-        probabilitiesNo : probabilitiesYes
+
+    var noFullAnswer = Math.exp(R1Prediction.score('no.'+trueWorld))
+    var noTaciturn   = Math.exp(R1Prediction.score('no.---'))
+    var noOther      = 1-(noTaciturn + noFullAnswer)
+    var probabilitiesNo  = [noTaciturn, noFullAnswer, noOther < 0 ? 0 : noOther] // number precision problems
+
+    // complex version of calculating fullAnswers also counts "yes.MC" when world is 'AE+MC'
+    // after question 'AE?'
+    // var yesFullAnswer = (question.text == "AE?" && cond == "yes" && trueWorld.includes("+")) ?
+    //     Math.exp(R1Prediction.score('yes.'+trueWorld)) +
+    //     Math.exp(R1Prediction.score('yes.'+trueWorld.slice(3))) :
+    //     Math.exp(R1Prediction.score('yes.'+trueWorld))
+
+    var yesFullAnswer = Math.exp(R1Prediction.score('yes.'+trueWorld))
+    // debug / testing collection of "fullAnswers"
+    // if (question.text == "AE?" && cond == "yes" && trueWorld.includes("+")) {
+    //     var otherFullAnswer = 'yes.' + trueWorld.slice(3)
+    //     console.log(otherFullAnswer)
+    //     console.log("prob addition: ", Math.exp(R1Prediction.score(otherFullAnswer)))
+    // }
+
+    var yesTaciturn   = Math.exp(R1Prediction.score('yes.---'))
+    var yesOther      = 1-(yesTaciturn + yesFullAnswer)
+    var probabilitiesYes =  [yesTaciturn, yesFullAnswer, yesOther < 0 ? 0 : yesOther] // number precision problems
+
+    var probabilities = question.text == "AE?" && cond == "no" ?  probabilitiesNo : probabilitiesYes
+
+    // console.log(probabilities)
+
     var answerType = categorical(
-          {vs: ["fullAnswer", "other"],
+        {vs: ["taciturn", "fullAnswer", "other"],
            ps: probabilities})
 
     return answerType
