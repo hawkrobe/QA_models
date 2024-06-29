@@ -43,7 +43,7 @@ full_matrix_data_2 <- read_csv(url(urlfile))
 model_preds_2 <- read_csv(here('03-current-models-webppl/data/prior_pred_full_matrix.csv'))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e1_plotting_proportions.csv"
-llm_preds_2 <- read_csv(url(urlfile))
+llm_preds_2 <- read_csv(url(urlfile)) 
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e1_llms_results.csv"
 all_llm_preds_2 <- read_csv(url(urlfile))
@@ -63,17 +63,72 @@ llm_preds_3 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e2_llms_results.csv"
 all_llm_preds_3 <- read_csv(url(urlfile))
+```
+
+```{r data-cleaning}
+answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive', 'unclassified')
 
 # reformat full matrix data
-
 full_matrix_2 <- full_matrix_data_2 %>%
   filter(trial_type == "main") %>%
   select(submission_id, itemName, targetOption,
          itemQuestion, competitor, otherCategory, sameCategory) 
-```
 
-```{r plot}
-answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive', 'unclassified')
+llm_preds_2 <- llm_preds_2 %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  )
+
+llm_preds_3 <- llm_preds_3 %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  )
+
+all_llm_preds_2 <- all_llm_preds_2 %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  )
+
+all_llm_preds_3 <- all_llm_preds_3 %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  )
 
 model_preds_2_summary <- model_preds_2 %>% 
   dplyr::group_by(scenario, support) %>% 
@@ -290,18 +345,6 @@ llm_summary_2 <- llm_preds_2 %>%
   select(-`human E1_human`) %>%
   rename(one_shot_cot_llama_instruct = `one-shot CoT_meta-llama/Meta-Llama-3-70B-Instruct`,
          zero_shot_llama_instruct = `zero-shot_meta-llama/Meta-Llama-3-70B-Instruct`) %>%
-  dplyr::mutate(
-    answerType = dplyr::case_when(
-      category == "taciturn" ~ 'taciturn',
-      category == "competitor" ~ 'competitor',
-      category == "sameCategory" ~ 'same category',
-      category == "mostSimilar" ~ 'most similar',
-      category == "fullList" ~ 'exhaustive',
-      category == "otherCategory" ~ 'other category',
-      category == NA_character_ ~ 'other response',
-      .default = "other response"
-    ) %>% factor(levels = answerOrder)
-  ) %>% 
   pivot_longer(cols = c('one_shot_cot_llama_instruct',
                              'zero_shot_llama_instruct'), 
                names_to = "agent", values_to = "prop") %>%
@@ -318,18 +361,6 @@ llm_summary_3 <- llm_preds_3 %>%
   select(-`human E2_human`) %>%
   rename(one_shot_cot_mixtral_instruct = `one-shot CoT_mistralai/Mixtral-8x7B-Instruct-v0.1`,
          zero_shot_mixtral_instruct = `zero-shot_mistralai/Mixtral-8x7B-Instruct-v0.1`) %>%
-  dplyr::mutate(
-    answerType = dplyr::case_when(
-      category == "taciturn" ~ 'taciturn',
-      category == "competitor" ~ 'competitor',
-      category == "sameCategory" ~ 'same category',
-      category == "mostSimilar" ~ 'most similar',
-      category == "fullList" ~ 'exhaustive',
-      category == "otherCategory" ~ 'other category',
-      category == NA_character_ ~ 'other response',
-      .default = "other response"
-    ) %>% factor(levels = answerOrder)
-  ) %>% 
   pivot_longer(cols = c('one_shot_cot_mixtral_instruct',
                              'zero_shot_mixtral_instruct'), 
                names_to = "agent", values_to = "prop") %>%
@@ -359,3 +390,9 @@ ggplot(all_summary, aes(x = agent, y = prop, fill = answerType)) +
                                    = 45, vjust = 1, hjust=1))
 ```
 
+```{r JSDs}
+by_item_all_agents_2 <- all_llm_preds_2 %>%
+
+  
+
+```

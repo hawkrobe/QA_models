@@ -1,0 +1,50 @@
+---
+title: "parameter tuning"
+output: html_document
+date: "2024-06-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(aida)    # remotes::install_github("michael-franke/aida-package")
+library(readr)
+library(furrr)
+library(here)
+
+
+# use the aida-theme for plotting
+theme_set(theme_aida())
+
+# global color scheme / non-optimized
+project_colors = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
+
+# setting theme colors globally
+scale_colour_discrete <- function(...) {
+  scale_colour_manual(..., values = project_colors)
+}
+scale_fill_discrete <- function(...) {
+  scale_fill_manual(..., values = project_colors)
+} 
+```
+
+```{r get-data, echo=FALSE}
+# get data for case study 2
+
+urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_QA-overinfo-freeTyping-cogsci_full_anonymized_categorized.csv"
+raw_empirical_responses_2 <- read_csv(url(urlfile))
+scenarios_2 <- unique(raw_empirical_responses_2$itemName)
+
+# RSA preds over many parameter values
+model_preds_many_params_2 <- read_csv(here('03-current-models-webppl/data/prior_pred_full_matrix.csv'))
+
+########
+
+# get data for case study 3
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_e2_human_category_cleaned4modeling.csv"
+raw_empirical_responses_3 <- read_csv(url(urlfile))
+scenarios_3 <- unique(raw_empirical_responses_3$itemName)
+
+# RSA preds over many parameter values
+model_preds_many_params_3 <- read_csv(here('03-current-models-webppl/data/multicontext_empirical.csv'))
+```
