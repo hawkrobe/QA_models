@@ -68,13 +68,13 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 1, max = 5), #3
-    'questionerAlpha'  = runif(1,min = 0, max = 3), #1-2
-    'R1Alpha'          = runif(1,min = 1, max = 2), #1-2
-    'relevanceBetaR0'  = runif(1,min = 0, max = 1),
-    'relevanceBetaR1'  = runif(1,min = 0.94, max = 0.99), #0.95-0.97
-    'costWeight'       = runif(1,min = 0.5, max = 1), #0.5
-    'questionCost'     = runif(1,min = 0, max = 0.5) #0.2
+    'policyAlpha'      = runif(1,min = 0, max = 10), #0-10
+    'questionerAlpha'  = runif(1,min = 0, max = 10), #0-10
+    'R1Alpha'          = runif(1,min = 0, max = 10), #0-10
+    'relevanceBetaR0'  = runif(1,min = 0, max = 1), #0-1
+    'relevanceBetaR1'  = runif(1,min = 0, max = 1), #0-1
+    'costWeight'       = runif(1,min = 0, max = 5), #0-5
+    'questionCost'     = runif(1,min = 0, max = 0) #0
   )
   return(params)
 }
@@ -96,7 +96,7 @@ empiricalPrior <- function(scenario) {
 }
 
 # run samples in parallel 
-samples_each = 100
+samples_each = 500
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
@@ -113,101 +113,5 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-write_csv(priorPred, './03-current-models-webppl/data/prior_pred_full_matrix.csv')
-priorPred <- read_csv('prior_pred_full_matrix.csv')
-
-priorPredSummary <- priorPred %>% 
-  dplyr::group_by(scenario, support) %>% 
-  dplyr::do(aida::summarize_sample_vector(.$prob)) %>% 
-  dplyr::select(-Parameter)
-
-answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'exhaustive', 'unclassified')
-
-empirical_recoded <- empirical_responses %>%
-  filter(trial_type != "filler") %>%
-  dplyr::mutate(
-    answerType = dplyr::case_when(
-      category == "taciturn" ~ 'taciturn',
-      category == "competitor" ~ 'competitor',
-      category == "sameCategory" ~ 'same category',
-      category == "fullList" ~ 'exhaustive',
-      category == "otherCategory" ~ 'other category',
-      category == NA_character_ ~ 'other response',
-      .default = "other response"
-    ) %>% factor(levels = answerOrder)
-  ) %>% 
-  rename(scenario = itemName) %>%
-  count(scenario, answerType) %>%
-  ungroup() %>%
-  group_by(scenario) %>%
-  mutate(mean = n/sum(n)) 
-
-empirical_recoded %>%
-  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
-  facet_wrap(~scenario) +
-  geom_col() +
-  theme(legend.position = 'none') +
-  xlab('answer type') +
-  ylab('mean prior predictive') + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-priorpred_recoded <- priorPredSummary %>% 
-  dplyr::mutate(
-    answerType = dplyr::case_when(
-      support == "no.---" ~ 'taciturn',
-      support == "no.competitor" ~ 'competitor',
-      support == "no.competitor+sameCat" ~ 'same category',
-      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
-      support == "no.otherCat" ~ 'other category'
-    ) %>% factor(levels = answerOrder)
-  ) 
-
-priorpred_recoded %>%
-  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
-  facet_wrap(~scenario) +
-  geom_col() +
-  #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
-  theme(legend.position = 'none') +
-  xlab('answer type') +
-  ylab('mean prior predictive') + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-priorpred_recoded %>%
-  group_by(scenario, answerType) %>%
-  summarise(all_prop = sum(mean)) %>%
-  ungroup() %>%
-  group_by(scenario) %>%
-  mutate(mean = all_prop/sum(all_prop)) %>%
-  select(-all_prop) %>%
-  left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
-            by = c("scenario", "answerType")) %>%
-  ggplot(aes(x = human_mean, y = mean)) +
-    geom_point() +
-    geom_smooth(method = 'lm') +
-    geom_abline(aes(intercept = 0, slope = 1)) +
-    theme(aspect.ratio = 1)
-
-priorpred_recoded %>%
-  group_by(scenario, answerType) %>%
-  summarise(all_prop = sum(mean)) %>%
-  ungroup() %>%
-  group_by(scenario) %>%
-  mutate(mean = all_prop/sum(all_prop)) %>%
-  select(-all_prop) %>%
-  left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
-            by = c("scenario", "answerType")) %>%
-  ggplot(aes(x = answerType, fill = answerType, y = human_mean)) +
-    geom_col() +
-    geom_crossbar(aes(ymin=mean,ymax=mean,y = mean),
-                  position = position_dodge(.5), width = .5,
-                  alpha = .5, size = .5) + 
-    facet_wrap(~scenario) +
-    #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
-    theme(legend.position = 'none') +
-    xlab('answer type') +
-    ylab('mean prior predictive') + 
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-
-
+write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
 

@@ -9,6 +9,7 @@
              "contextModels-creditCards-Priors.webppl",
              "contextModels-pieCake.webppl",
              "contextModels-TSO.webppl",
+             "contextModels-TSOS.webppl",
              "pragmaticQA-core-model.webppl"
             ]
   },

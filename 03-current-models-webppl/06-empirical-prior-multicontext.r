@@ -34,8 +34,8 @@ urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-
 priors <- read_csv(url(urlfile))
 scenarios <- unique(priors$itemName)
 
-run_model_tso <- function (params, utils) {
-  webPPL_data <- tibble('task' = "TSO") %>% 
+run_model_tsos <- function (params, utils) {
+  webPPL_data <- tibble('task' = "TSOS") %>% 
     cbind(params) %>% 
     cbind(utils)
   
@@ -51,13 +51,13 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 1, max = 5), #3
-    'questionerAlpha'  = runif(1,min = 0, max = 3), #1-2
-    'R1Alpha'          = runif(1,min = 1, max = 2), #1-2
-    'relevanceBetaR0'  = runif(1,min = 0, max = 1),
-    'relevanceBetaR1'  = runif(1,min = 0.94, max = 0.99), #0.95-0.97
-    'costWeight'       = runif(1,min = 0.5, max = 1), #0.5
-    'questionCost'     = runif(1,min = 0, max = 0.5) #0.2
+    'policyAlpha'      = runif(1,min = 0, max = 10), #0-10
+    'questionerAlpha'  = runif(1,min = 0, max = 10), #0-10
+    'R1Alpha'          = runif(1,min = 0, max = 10), #0-10
+    'relevanceBetaR0'  = runif(1,min = 0, max = 1), #0-1
+    'relevanceBetaR1'  = runif(1,min = 0, max = 1), #0-1
+    'costWeight'       = runif(1,min = 0, max = 5), #0-5
+    'questionCost'     = runif(1,min = 0, max = 0) #0
   )
   return(params)
 }
@@ -78,7 +78,7 @@ empiricalPrior <- function(scenario) {
 }
 
 # run samples in parallel 
-samples_each = 100
+samples_each = 500
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
@@ -91,8 +91,8 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(scenario) %>%
-    cbind(run_model_tso(params, utils))
+    cbind(run_model_tsos(params, utils))
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-write_csv(priorPred, './03-current-models-webppl/data/multicontext_empirical.csv')
+write_csv(priorPred, './03-current-models-webppl/data/case_study_3_parameter_search.csv')
