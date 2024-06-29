@@ -7,8 +7,8 @@ var makeR = function(){
 
  // console.log("Starting task: ", RInput[0].task)
  // console.log("R1Input", RInput)
-  if (RInput[0].task == "TSO") {
-    // target-same-other setting (1st pilot)
+  if (RInput[0].task == "TSOS") {
+    // target-same-other-mostsimilar setting 
 
     var params =
       {
@@ -22,7 +22,7 @@ var makeR = function(){
       }
 
     var contextLocal = extend(
-      tsoContext,
+      tsosContext,
       {decisionProblem : function(w, a) {
         return _.includes(w, a) ?
           (a == 'target' ? RInput[0].utilTarget :
@@ -52,9 +52,15 @@ var makeR = function(){
         var response = sample(R1Prediction);
         var match = response == 'no.---' ? true :
             response == 'no.competitor' ? true :
-            response == 'no.competitor+sameCat' ? true :
             response == 'no.otherCat' ? true :
+            response == 'no.sameCat' ? true :
             response == 'no.mostSimilar' ? true :
+            response == 'no.competitor+sameCat' ? true :
+            response == 'no.competitor+otherCat' ? true :
+            response == 'no.competitor+mostSimilar' ? true :
+            response == 'no.sameCat+mostSimilar' ? true :
+            response == 'no.sameCat+otherCat' ? true :
+            response == 'no.otherCat+mostSimilar' ? true :
             response == 'no.competitor+sameCat+otherCat+mostSimilar' ? true : false
         condition(match)
         return(response)
