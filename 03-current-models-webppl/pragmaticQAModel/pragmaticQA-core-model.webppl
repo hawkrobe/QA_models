@@ -247,6 +247,7 @@ var R1Averager = cache(function(context, R1PriorContext, question, params) {
         // terminalViz(otherBeliefs, 4)
         var decisionProblem = context_sample.decisionProblem;
         var actionPolicy = getActionPolicy(otherBeliefs, context_sample, params);
+
         // console.log("action policy after response: ", response)
         // terminalViz(actionPolicy, 4)
         var actionUtility = expectation(actionPolicy, function(action) {
