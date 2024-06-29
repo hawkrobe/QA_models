@@ -32,7 +32,7 @@ var creditCardContext = {
     {type: 'polar-disjunct', queried: ['AE', 'CB'], text: 'AE or CB?'},
     {type: 'polar-disjunct', queried: ['MC', 'CB'], text: 'MC or CB?'},
     {type: 'polar-disjunct', queried: ['AE', 'MC', 'CB'], text: 'Any?'},
-    {type: 'wh', queried: ['AE', 'MC', 'CB'], text: 'Which?'}
+    // {type: 'wh', queried: ['AE', 'MC', 'CB'], text: 'Which?'}
   ],
 
   // assume questioner is uncertain but answerer has Delta on true world (e.g. shopkeep)
