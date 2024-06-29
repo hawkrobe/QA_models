@@ -188,6 +188,34 @@ model_preds_2_summary %>%
     geom_abline(aes(intercept = 0, slope = 1)) +
     theme(aspect.ratio = 1)
 
+model_preds_2_summary %>%
+  group_by(scenario, answerType) %>%
+  summarise(all_prop = sum(mean)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(mean = all_prop/sum(all_prop)) %>%
+  select(-all_prop) %>%
+  ungroup() %>%
+  mutate(agent = "model") %>% 
+  rbind(empirical_responses_2 %>% select(-n) %>% mutate(agent = "human")) %>%
+  ggplot(aes(x = agent, y = mean, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") + 
+    facet_wrap(~scenario)
+
+model_preds_3_summary %>%
+  group_by(scenario, answerType) %>%
+  summarise(all_prop = sum(mean)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(mean = all_prop/sum(all_prop)) %>%
+  select(-all_prop) %>%
+  ungroup() %>%
+  mutate(agent = "model") %>% 
+  rbind(empirical_responses_3 %>% select(-n) %>% mutate(agent = "human")) %>%
+  ggplot(aes(x = agent, y = mean, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") + 
+    facet_wrap(~scenario)
+
 priorpred_recoded %>%
   group_by(scenario, answerType) %>%
   summarise(all_prop = sum(mean)) %>%
