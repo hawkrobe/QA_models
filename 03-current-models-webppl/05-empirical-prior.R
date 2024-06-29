@@ -26,7 +26,7 @@ scale_fill_discrete <- function(...) {
 ##################################################
 
 
-# get empirical priors
+# get data
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E1-priorElicitation-sliderRating-full_450_byItem_means.csv"
 priors <- read_csv(url(urlfile))
 scenarios <- unique(priors$itemName)
