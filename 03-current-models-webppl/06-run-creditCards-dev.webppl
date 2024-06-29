@@ -1,0 +1,346 @@
+//  -------------------
+// | global parameters |
+//  -------------------
+
+var params = {
+  policyAlpha     : 2.5,    // SM-alpha for action policy
+  questionerAlpha : 1.5,      // SM-alpha for question choice
+  R1Alpha         : 5,      // SM-alpha for R1
+  relevanceBetaR0 : 0,      // beta=1 for only action-utility
+  relevanceBetaR1 : 0.9,   //
+  costWeight      : 0.3,
+  questionCost    : 0    // cost for a question (relative to no question)
+};
+
+// var params = {
+//   policyAlpha     : 2.5,    // SM-alpha for action policy
+//   questionerAlpha : 1,      // SM-alpha for question choice
+//   R1Alpha         : 4,      // SM-alpha for R1
+//   relevanceBetaR0 : 0,      // beta=1 for only action-utility
+//   relevanceBetaR1 : 0.95,   //
+//   costWeight      : 0.2,
+//   questionCost    : 0    // cost for a question (relative to no question)
+// };
+
+console.log(params)
+
+//  ------------------
+// | test CC example |
+//  ------------------
+
+
+// var context = creditCardContext ;
+// console.log('context: \t', context.name);
+
+// var worlds = context.worlds;
+// console.log('worlds: \t', worlds);
+
+// var question = context.questions[6];
+// console.log('question: \t', question.text)
+
+// var world = 'AE+CB';
+// console.log('world: \t\t', world);
+
+// var responsesR0 = context.getLicensedResponsesR0
+// console.log('R0 resp. set: \t', responsesR0(question))
+
+// var responseR0 = responsesR0(question)[0]
+// console.log('response R0: \t', responseR0)
+
+// var meaning = context.meaning
+// console.log('truth R0 r.: \t', meaning(world,question,responseR0));
+
+// var responsesR1 = context.getLicensedResponsesR1
+// console.log('R1 resp. set \t: ', responsesR1(question))
+
+// var responseR1 = responsesR1(question)[0]
+// console.log('response R1: \t', responseR1)
+
+// var meaning = context.meaning
+// console.log('truth R1 r.: \t', meaning(world,question,responseR1));
+
+// var R0_test = R0(question, context, params)
+
+// console.log("R0:")
+// terminalViz(R0_test, 4)
+
+// var Q1_test = Q1(context, params)
+// console.log("Q1:")
+// terminalViz(Q1_test, 4)
+
+// var R0Ext_test = R1ContextFree(question, context, params)
+// console.log("R0 (extended):")
+// terminalViz(R0Ext_test, 4)
+
+// var trueWorlds = ["AE", "MC", "CB", "AE+MC", "AE+CB", "MC+CB", "AE+MC+CB"]
+
+// show detailed responses of R1 for every world state (what the restaurant has)
+
+// map(function(trueWorld) {
+
+//     console.log("---\ntrueWorld: \t", trueWorld)
+
+//     var R1posterior = R1ContextPosterior(
+//         extend(creditCardContext,
+//                {R0PriorOverWorlds: Delta({v: trueWorld}),
+//                 R1PriorOverWorlds: Delta({v: trueWorld}),
+//                }),
+//         question,
+//         createPragmaticListenerPrior(trueWorld),
+//         params)
+
+
+//     console.log("Posterior beliefs about which CC Questioner has:")
+//     terminalViz(marginalize(R1posterior, 'label'),4)
+
+
+//     var R1Prediction = R1Averager(
+//         extend(creditCardContext,
+//                {R0PriorOverWorlds: Delta({v: trueWorld}),
+//                 R1PriorOverWorlds: Delta({v: trueWorld}),
+//                }),
+//         createPragmaticListenerPrior(trueWorld),
+//         question,
+//         params)
+
+//     console.log("R1 (Averager):")
+//     terminalViz(R1Prediction, 4)
+
+// }, trueWorlds)
+
+
+// ---------------------------------------------
+// testing R1 with full knowledge of preferences
+// ---------------------------------------------
+
+// console.log("---------------------------------------------\n",
+//             "Testing R1 with full knowledge of credit card\n",
+//             "---------------------------------------------\n")
+
+// R1 knows full context model
+// var R1Prior_FullKnowledge = {
+//   trueWorld: context,
+//   distribution: Categorical({vs: ["trueWorld"]})
+// }
+
+// var R1posterior = R1ContextPosterior(context, question, R1Prior_FullKnowledge, params);
+// console.log("Posterior inference (trivial)")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+
+// var R1Prediction = R1Averager(context, R1Prior_FullKnowledge, question, params)
+// console.log("R1-Averager (full knowledge):")
+// terminalViz(R1Prediction)
+
+// ---------------------------------------------
+// testing R1 with uncertainty about preferences
+// ---------------------------------------------
+
+
+// Clark's basic observation -------------------------------------
+
+console.log(" ---------------------------------------------------------\n",
+            " Clark's basic case (AE? available?; all CCs eq. likely)\n",
+            "---------------------------------------------------------\n")
+
+var trueWorlds = ["AE", "MC", "CB", "AE+MC", "AE+CB", "MC+CB", "AE+MC+CB"]
+
+
+var getAnswerTypeDistribution = function(question, cond) {
+
+  var answerTypeDist = Infer({method: 'enumerate'}, function(){
+    var trueWorld = uniformDraw(trueWorlds)
+    // console.log('trueWorld: \t', trueWorld)
+    var R1Prediction = R1Averager(
+      extend(creditCardContext,
+             {R0PriorOverWorlds: Delta({v: trueWorld}),
+              R1PriorOverWorlds: Delta({v: trueWorld}),
+             }),
+      createPragmaticListenerPrior(trueWorld),
+      question,
+      params)
+    // console.log(question.text)
+    if (question.text == "AE?") {
+      if (cond == "no") {
+        condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length == 0)
+      }
+      if (cond == "yes") {
+        condition(_.intersection(_.split(trueWorld, '+'), ["AE"]).length > 0)
+      }
+    }
+
+    var noFullAnswer = Math.exp(R1Prediction.score('no.'+trueWorld))
+    var noTaciturn   = Math.exp(R1Prediction.score('no.---'))
+    var noOther      = 1-(noTaciturn + noFullAnswer)
+    var probabilitiesNo  = [noTaciturn, noFullAnswer, noOther < 0 ? 0 : noOther] // number precision problems
+
+    // complex version of calculating fullAnswers also counts "yes.MC" when world is 'AE+MC'
+    // after question 'AE?'
+    // var yesFullAnswer = (question.text == "AE?" && cond == "yes" && trueWorld.includes("+")) ?
+    //     Math.exp(R1Prediction.score('yes.'+trueWorld)) +
+    //     Math.exp(R1Prediction.score('yes.'+trueWorld.slice(3))) :
+    //     Math.exp(R1Prediction.score('yes.'+trueWorld))
+
+    var yesFullAnswer = Math.exp(R1Prediction.score('yes.'+trueWorld))
+    // debug / testing collection of "fullAnswers"
+    // if (question.text == "AE?" && cond == "yes" && trueWorld.includes("+")) {
+    //     var otherFullAnswer = 'yes.' + trueWorld.slice(3)
+    //     console.log(otherFullAnswer)
+    //     console.log("prob addition: ", Math.exp(R1Prediction.score(otherFullAnswer)))
+    // }
+
+    var yesTaciturn   = Math.exp(R1Prediction.score('yes.---'))
+    var yesOther      = 1-(yesTaciturn + yesFullAnswer)
+    var probabilitiesYes =  [yesTaciturn, yesFullAnswer, yesOther < 0 ? 0 : yesOther] // number precision problems
+
+    var probabilities = question.text == "AE?" && cond == "no" ?  probabilitiesNo : probabilitiesYes
+
+    // console.log(probabilities)
+
+    var answerType = categorical(
+        {vs: ["taciturn", "fullAnswer", "other"],
+           ps: probabilities})
+
+    return answerType
+  })
+
+  return(answerTypeDist)
+
+}
+
+console.log('question: \t', creditCardContext.questions[6].text)
+var answerTypeDist_any = getAnswerTypeDistribution(creditCardContext.questions[6])
+terminalViz(answerTypeDist_any,4)
+
+console.log('question: \t', creditCardContext.questions[0].text, '\t condition: \tAE not available')
+var answerTypeDist_AE = getAnswerTypeDistribution(creditCardContext.questions[0], "no")
+terminalViz(answerTypeDist_AE,4)
+
+console.log('question: \t', creditCardContext.questions[0].text, '\t condition: \tAE available')
+var answerTypeDist_AE = getAnswerTypeDistribution(creditCardContext.questions[0], "yes")
+terminalViz(answerTypeDist_AE,4)
+
+
+
+
+// console.log("\n")
+
+
+// // CASE 1 -------------------------------------
+
+// var question_1 = creditCardContext.questions[6];
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 1 (highPrior: AE and MC available)    \n",
+//             "---------------------------------------------------------\n")
+
+// console.log('question: \t', question_1.text)
+
+// var R1posterior = R1ContextPosterior(creditCardContext, question_1, R1Prior_Uncertainty_highPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(creditCardContext, R1Prior_Uncertainty_highPior, question_1, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+// console.log("\n")
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 1 (lowPrior: MC and CB available)    \n",
+//             "---------------------------------------------------------\n")
+
+// console.log('question: \t', question_1.text)
+
+// var trueWorld = "MC+CB";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+// var R1posterior = R1ContextPosterior(contextModel, question_1, R1Prior_Uncertainty_lowPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_lowPior, question_1, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+
+// console.log("\n")
+
+// // CASE 2 -------------------------------------
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 2 (highPrior: AE and MC available)    \n",
+//             "---------------------------------------------------------\n")
+
+// var question_2 = creditCardContext.questions[1];
+
+// console.log('question: \t', question_2.text)
+
+// var trueWorld = "AE+MC";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+// var R1posterior = R1ContextPosterior(contextModel, question_2, R1Prior_Uncertainty_highPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_highPior, question_2, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+
+
+// console.log("\n")
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 2 (lowPrior: MC and CB available)    \n",
+//             "---------------------------------------------------------\n")
+
+// console.log('question: \t', question_2.text)
+
+// var trueWorld = "MC+CB";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+// var R1posterior = R1ContextPosterior(contextModel, question_2, R1Prior_Uncertainty_lowPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_lowPior, question_2, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)
+
+// console.log("\n")
+
+
+// // CASE 3 -------------------------------------
+
+// console.log(" ---------------------------------------------------------\n",
+//             "        Case 3 (medPrior: AE and CB available)    \n",
+//             "---------------------------------------------------------\n")
+
+// var question_3 = creditCardContext.questions[1];
+
+// console.log('question: \t', question_3.text)
+
+// var trueWorld = "AE+CB";
+// var contextModel = extend(creditCardContext,
+//              {R0PriorOverWorlds: Delta({v: trueWorld}),
+//               R1PriorOverWorlds: Delta({v: trueWorld}),
+//              })
+
+
+// var R1posterior = R1ContextPosterior(contextModel, question_3, R1Prior_Uncertainty_medPior, params);
+// console.log("Posterior beliefs about which CC Questioner has:")
+// terminalViz(marginalize(R1posterior, 'label'),4)
+
+// var R1Prediction = R1Averager(contextModel, R1Prior_Uncertainty_medPior, question_3, params)
+// console.log("Probability of answers:")
+// terminalViz(R1Prediction,4)

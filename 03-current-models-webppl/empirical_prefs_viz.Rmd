@@ -1,6 +1,6 @@
 ---
 title: "empirical pref viz"
-output: html_document
+output: pdf_document
 date: "2024-06-06"
 ---
 
@@ -29,39 +29,82 @@ scale_fill_discrete <- function(...) {
 ```
 
 ```{r get-data, echo=FALSE}
-# get empirical priors
+# get data for case study 2
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E1-priorElicitation-sliderRating-full_450_byItem_means.csv"
-priors <- read_csv(url(urlfile))
-scenarios <- unique(priors$itemName)
+priors_2 <- read_csv(url(urlfile))
+scenarios_2 <- unique(priors_2$itemName)
 
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_QA-overinfo-freeTyping-cogsci_full_anonymized_categorized.csv"
-empirical_responses <- read_csv(url(urlfile))
+raw_empirical_responses_2 <- read_csv(url(urlfile))
 
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E1-priorElicitation-sliderRating-full_450_anonymized.csv"
-full_matrix_data <- read_csv(url(urlfile))
+full_matrix_data_2 <- read_csv(url(urlfile))
+
+model_preds_2 <- read_csv(here('03-current-models-webppl/data/prior_pred_full_matrix.csv'))
+
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e1_plotting_proportions.csv"
+llm_preds_2 <- read_csv(url(urlfile))
+
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e1_llms_results.csv"
+all_llm_preds_2 <- read_csv(url(urlfile))
+
+# get data for case study 3
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_e2_human_category_cleaned4modeling.csv"
+raw_empirical_responses_3 <- read_csv(url(urlfile))
+
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E2-priorElicitation-sliderRating-full_120.csv"
+priors_3 <- read_csv(url(urlfile))
+scenarios_3 <- unique(raw_empirical_responses_3$itemName)
+
+model_preds_3 <- read_csv(here('03-current-models-webppl/data/multicontext_empirical.csv'))
+
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e2_plotting_proportions.csv"
+llm_preds_3 <- read_csv(url(urlfile))
+
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e2_llms_results.csv"
+all_llm_preds_3 <- read_csv(url(urlfile))
 
 # reformat full matrix data
 
-full_matrix <- full_matrix_data %>%
+full_matrix_2 <- full_matrix_data_2 %>%
   filter(trial_type == "main") %>%
   select(submission_id, itemName, targetOption,
          itemQuestion, competitor, otherCategory, sameCategory) 
-
-full_matrix %>%
-  count(itemName, targetOption)
-
-priorPred <- read_csv(here('03-current-models-webppl/data/prior_pred_full_matrix.csv'))
 ```
 
 ```{r plot}
-priorPredSummary <- priorPred %>% 
+answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive', 'unclassified')
+
+model_preds_2_summary <- model_preds_2 %>% 
   dplyr::group_by(scenario, support) %>% 
   dplyr::do(aida::summarize_sample_vector(.$prob)) %>% 
-  dplyr::select(-Parameter)
+  dplyr::select(-Parameter) %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      support == "no.otherCat" ~ 'other category'
+    ) %>% factor(levels = answerOrder)
+  ) 
 
-answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'exhaustive', 'unclassified')
+model_preds_3_summary <- model_preds_3 %>% 
+  filter(scenario %in% scenarios_3) %>%
+  dplyr::group_by(scenario, support) %>% 
+  dplyr::do(aida::summarize_sample_vector(.$prob)) %>% 
+  dplyr::select(-Parameter) %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      support == "no.otherCat" ~ 'other category'
+    ) %>% factor(levels = answerOrder)
+  ) 
 
-empirical_recoded <- empirical_responses %>%
+empirical_responses_2 <- raw_empirical_responses_2 %>%
   filter(trial_type != "filler") %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
@@ -77,10 +120,42 @@ empirical_recoded <- empirical_responses %>%
   rename(scenario = itemName) %>%
   count(scenario, answerType) %>%
   ungroup() %>%
+  filter(!is.na(answerType)) %>%
   group_by(scenario) %>%
   mutate(mean = n/sum(n)) 
 
-empirical_recoded %>%
+empirical_responses_3 <- raw_empirical_responses_3 %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>% 
+  rename(scenario = itemName) %>%
+  count(scenario, answerType) %>%
+  ungroup() %>%
+  filter(!is.na(answerType)) %>%
+  group_by(scenario) %>%
+  mutate(mean = n/sum(n)) 
+```
+
+```{r plot-human-data}
+empirical_responses_2 %>%
+  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
+  facet_wrap(~scenario) +
+  geom_col() +
+  theme(legend.position = 'none') +
+  xlab('answer type') +
+  ylab('prop answer') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+empirical_responses_3 %>%
   ggplot(aes(x = answerType, fill = answerType, y = mean)) +
   facet_wrap(~scenario) +
   geom_col() +
@@ -90,19 +165,8 @@ empirical_recoded %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
 
-```{r}
-priorpred_recoded <- priorPredSummary %>% 
-  dplyr::mutate(
-    answerType = dplyr::case_when(
-      support == "no.---" ~ 'taciturn',
-      support == "no.competitor" ~ 'competitor',
-      support == "no.competitor+sameCat" ~ 'same category',
-      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
-      support == "no.otherCat" ~ 'other category'
-    ) %>% factor(levels = answerOrder)
-  ) 
-
-priorpred_recoded %>%
+```{r plot-rsa-data}
+model_preds_2_summary %>%
   ggplot(aes(x = answerType, fill = answerType, y = mean)) +
   facet_wrap(~scenario) +
   geom_col() +
@@ -112,14 +176,26 @@ priorpred_recoded %>%
   ylab('prop') + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-priorpred_recoded %>%
+model_preds_3_summary %>%
+  ggplot(aes(x = answerType, fill = answerType, y = mean)) +
+  facet_wrap(~scenario) +
+  geom_col() +
+  #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
+  theme(legend.position = 'none') +
+  xlab('answer type') +
+  ylab('prop') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r scatterplots}
+model_preds_2_summary %>%
   group_by(scenario, answerType) %>%
   summarise(all_prop = sum(mean)) %>%
   ungroup() %>%
   group_by(scenario) %>%
   mutate(mean = all_prop/sum(all_prop)) %>%
   select(-all_prop) %>%
-  left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
+  left_join(empirical_responses_2 %>% rename(human_mean = mean) %>% select(-n), 
             by = c("scenario", "answerType")) %>%
   ggplot(aes(x = human_mean, y = mean)) +
     geom_point() +
@@ -127,80 +203,159 @@ priorpred_recoded %>%
     geom_abline(aes(intercept = 0, slope = 1)) +
     theme(aspect.ratio = 1)
 
-priorpred_recoded %>%
+model_preds_3_summary %>%
   group_by(scenario, answerType) %>%
   summarise(all_prop = sum(mean)) %>%
   ungroup() %>%
   group_by(scenario) %>%
   mutate(mean = all_prop/sum(all_prop)) %>%
   select(-all_prop) %>%
-  left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
+  left_join(empirical_responses_3 %>% rename(human_mean = mean) %>% select(-n), 
             by = c("scenario", "answerType")) %>%
-  ggplot(aes(x = answerType, fill = answerType, y = human_mean)) +
-    geom_col() +
-    geom_crossbar(aes(ymin=mean,ymax=mean,y = mean),
-                  position = position_dodge(.5), width = .5,
-                  alpha = .5, size = .5) + 
-    facet_wrap(~scenario) +
-    #geom_errorbar(aes(ymin = `|95%`, ymax = `95%|`), alpha = 0.3, width =0.2) +
-    theme(legend.position = 'none') +
-    xlab('answer type') +
-    ylab('mean prior predictive') + 
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  ggplot(aes(x = human_mean, y = mean)) +
+    geom_point() +
+    geom_smooth(method = 'lm') +
+    geom_abline(aes(intercept = 0, slope = 1)) +
+    theme(aspect.ratio = 1)
+```
 
+```{r rsa-human-itemwise-plots}
+model_preds_2_summary %>%
+  group_by(scenario, answerType) %>%
+  summarise(all_prop = sum(mean)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(mean = all_prop/sum(all_prop)) %>%
+  select(-all_prop) %>%
+  ungroup() %>%
+  mutate(agent = "model") %>% 
+  rbind(empirical_responses_2 %>% select(-n) %>% mutate(agent = "human")) %>%
+  ggplot(aes(x = agent, y = mean, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") + 
+    facet_wrap(~scenario)
 
-all_obs <- priorPred %>%
+model_preds_3_summary %>%
+  group_by(scenario, answerType) %>%
+  summarise(all_prop = sum(mean)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(mean = all_prop/sum(all_prop)) %>%
+  select(-all_prop) %>%
+  ungroup() %>%
+  mutate(agent = "model") %>% 
+  rbind(empirical_responses_3 %>% select(-n) %>% mutate(agent = "human")) %>%
+  ggplot(aes(x = agent, y = mean, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") + 
+    facet_wrap(~scenario)
+```
+
+```{r all-agents-summaries}
+empirical_2_summary <- empirical_responses_2 %>%
+  group_by(answerType) %>%
+  summarise(sum = sum(mean)) %>%
+  ungroup() %>%
+  mutate(prop = sum/sum(sum)) %>%
+  select(-sum) %>%
+  mutate(agent = "human",
+         case_study = "case_study_2")
+
+rsa_preds_2_summary <- model_preds_2_summary %>%
+  group_by(answerType) %>%
+  summarise(sum = sum(mean)) %>%
+  ungroup() %>%
+  mutate(prop = sum/sum(sum)) %>%
+  select(-sum) %>%
+  mutate(agent = "rsa",
+         case_study = "case_study_2")
+
+empirical_3_summary <- empirical_responses_3 %>%
+  group_by(answerType) %>%
+  summarise(sum = sum(mean)) %>%
+  ungroup() %>%
+  mutate(prop = sum/sum(sum)) %>%
+  select(-sum) %>%
+  mutate(agent = "human",
+         case_study = "case_study_3")
+
+rsa_preds_3_summary <- model_preds_3_summary %>%
+  group_by(answerType) %>%
+  summarise(sum = sum(mean)) %>%
+  ungroup() %>%
+  mutate(prop = sum/sum(sum)) %>%
+  select(-sum) %>%
+  mutate(agent = "rsa",
+         case_study = "case_study_3")
+
+llm_summary_2 <- llm_preds_2 %>%
+  select(-`human E1_human`) %>%
+  rename(one_shot_cot_llama_instruct = `one-shot CoT_meta-llama/Meta-Llama-3-70B-Instruct`,
+         zero_shot_llama_instruct = `zero-shot_meta-llama/Meta-Llama-3-70B-Instruct`) %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
-      support == "no.---" ~ 'taciturn',
-      support == "no.competitor" ~ 'competitor',
-      support == "no.competitor+sameCat" ~ 'same category',
-      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
-      support == "no.otherCat" ~ 'other category'
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
     ) %>% factor(levels = answerOrder)
-  ) %>%
-  left_join(empirical_recoded %>% rename(human_mean = mean) %>% select(-n), 
-            by = c("scenario", "answerType")) %>%
-  mutate(human_mean = if_else(is.na(human_mean), 0, human_mean)) %>%
-  mutate(error = abs(prob - human_mean))
+  ) %>% 
+  pivot_longer(cols = c('one_shot_cot_llama_instruct',
+                             'zero_shot_llama_instruct'), 
+               names_to = "agent", values_to = "prop") %>%
+  filter(answerType != "other") %>%
+  group_by(agent, answerType) %>%
+  summarise(sum = sum(prop)) %>%
+  ungroup() %>%
+  group_by(agent) %>%
+  mutate(prop = sum/sum(sum)) %>%
+  select(-sum) %>%
+  mutate(case_study = "case_study_2")
+
+llm_summary_3 <- llm_preds_3 %>%
+  select(-`human E2_human`) %>%
+  rename(one_shot_cot_mixtral_instruct = `one-shot CoT_mistralai/Mixtral-8x7B-Instruct-v0.1`,
+         zero_shot_mixtral_instruct = `zero-shot_mistralai/Mixtral-8x7B-Instruct-v0.1`) %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>% 
+  pivot_longer(cols = c('one_shot_cot_mixtral_instruct',
+                             'zero_shot_mixtral_instruct'), 
+               names_to = "agent", values_to = "prop") %>%
+  filter(answerType != "other") %>%
+  group_by(agent, answerType) %>%
+  summarise(sum = sum(prop)) %>%
+  ungroup() %>%
+  group_by(agent) %>%
+  mutate(prop = sum/sum(sum)) %>%
+  select(-sum) %>%
+  mutate(case_study = "case_study_3")
+
+agent_order = c("human", "rsa", 'zero_shot_mixtral_instruct', 'zero_shot_llama_instruct',
+          'one_shot_cot_mixtral_instruct', 'one_shot_cot_llama_instruct')
+
+all_summary = rbind(empirical_2_summary, empirical_3_summary, llm_summary_2, 
+                    llm_summary_3, rsa_preds_2_summary, rsa_preds_3_summary) %>%
+  mutate(agent = factor(agent, levels = agent_order))
 ```
 
-
-```{r}
-all_obs %>%
-  ggplot(aes(x = questionCost, y = error)) +
-  geom_smooth()
-
-all_obs %>%
-  ggplot(aes(x = policyAlpha, y = error)) +
-  geom_smooth()
-
-all_obs %>%
-  ggplot(aes(x = questionerAlpha, y = error)) +
-  geom_smooth()
-
-all_obs %>%
-  ggplot(aes(x = R1Alpha, y = error)) +
-  geom_smooth()
-
-all_obs %>%
-  ggplot(aes(x = relevanceBetaR1, y = error)) +
-  geom_smooth()
-
-all_obs %>%
-  ggplot(aes(x = costWeight, y = error)) +
-  geom_smooth()
-
+```{r paper-fig-plot}
+ggplot(all_summary, aes(x = agent, y = prop, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") +
+  scale_x_discrete(drop = TRUE) +
+  facet_wrap(~case_study, scales = "free") +
+  theme(axis.text.x = element_text(angle 
+                                   = 45, vjust = 1, hjust=1))
 ```
 
-
-```{r}
-priors %>%
-  mutate(received_option = factor(received_option, levels = c("target", 
-                                                              "competitor", "sameCategory", "otherCategory"))) %>%
-  filter(requested_option == "target") %>%
-  ggplot(aes(x = received_option, fill = received_option, y = mean_response)) +
-  geom_col() +
-  facet_wrap(~itemName)  + 
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-```
