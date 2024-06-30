@@ -61,6 +61,10 @@ var makeR = function(){
             response == 'no.sameCat+mostSimilar' ? true :
             response == 'no.sameCat+otherCat' ? true :
             response == 'no.otherCat+mostSimilar' ? true :
+            response == 'no.competitor+sameCat+otherCat' ? true :
+            response == 'no.competitor+sameCat+mostSimilar' ? true :
+            response == 'no.competitor+otherCat+mostSimilar' ? true :
+            response == 'no.sameCat+otherCat+mostSimilar' ? true :
             response == 'no.competitor+sameCat+otherCat+mostSimilar' ? true : false
         condition(match)
         return(response)
