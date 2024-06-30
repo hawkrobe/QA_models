@@ -51,29 +51,17 @@ run_model_tsos <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 4.8, max = 4.8), # searched 0-10
-    'questionerAlpha'  = runif(1,min = 5.3, max = 5.3), # searched 0-10
-    'R1Alpha'          = runif(1,min = 6.9, max = 6.9), # searched 0-10
-    'relevanceBetaR0'  = runif(1,min = 0.49, max = 0.49), # searched 0-1
-    'relevanceBetaR1'  = runif(1,min = 0.58, max = 0.58), # searched 0-1
-    'costWeight'       = runif(1,min = 3.7, max = 3.7), # searched 0-5
-    'questionCost'     = runif(1,min = 0, max = 0) # fixed at 0
-  )
-  return(params)
-}
-
-priorSampleParams <- function() {
-  params <- tibble(
     'policyAlpha'      = runif(1,min = 0, max = 10), # searched 0-10
     'questionerAlpha'  = runif(1,min = 0, max = 10), # searched 0-10
     'R1Alpha'          = runif(1,min = 0, max = 10), # searched 0-10
-    'relevanceBetaR0'  = runif(1,min = 0, max = 1), # searched 0-1
+    'relevanceBetaR0'  = runif(1,min = 0, max = 0), # fixed at 0
     'relevanceBetaR1'  = runif(1,min = 0, max = 1), # searched 0-1
     'costWeight'       = runif(1,min = 0, max = 5), # searched 0-5
     'questionCost'     = runif(1,min = 0, max = 0) # fixed at 0
   )
   return(params)
 }
+
 
 empiricalPrior <- function(scenario) {
   these_priors <- priors %>% 
@@ -91,7 +79,7 @@ empiricalPrior <- function(scenario) {
 }
 
 # run samples in parallel 
-samples_each = 500 # 1000 for param search
+samples_each = 1000 # 1000 for param search
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
@@ -108,6 +96,6 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-#write_csv(priorPred, './03-current-models-webppl/data/case_study_3_parameter_search.csv')
-write_csv(priorPred, './03-current-models-webppl/data/case_study_3_RSA_preds.csv')
+write_csv(priorPred, './03-current-models-webppl/data/case_study_3_parameter_search.csv')
+#write_csv(priorPred, './03-current-models-webppl/data/case_study_3_RSA_preds.csv')
 
