@@ -112,7 +112,7 @@ JSD_2 <- model_human_2 %>%
   mutate(JSD = JSD(rbind(prob, human_prop))) %>%
   ungroup()
 
-JSD_2 %>%
+min_JSDs_2 <- JSD_2 %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
            relevanceBetaR1, costWeight, scenario) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
@@ -121,12 +121,17 @@ JSD_2 %>%
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
-  slice_min(n = 20, order_by = JSD)
+  slice_min(n = 100, order_by = JSD)
+
+params_2 <- min_JSDs_2 %>%
+  summarise(mean(policyAlpha), mean(questionerAlpha), mean(R1Alpha), mean(relevanceBetaR0),
+            mean(relevanceBetaR1), mean(costWeight))
+
+write_csv(params_2, here("03-current-models-webppl/data/params_case_study_2.csv"))
 ```
 
 ```{r pick-params-3}
 empirical_3_summary <- raw_empirical_responses_3 %>%
-  filter(trial_type != "filler") %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
       category == "taciturn" ~ 'taciturn',
@@ -148,7 +153,8 @@ empirical_3_summary <- raw_empirical_responses_3 %>%
   select(-n)
 
 model_human_3 <- model_preds_many_params_3 %>%
-    dplyr::mutate(
+  filter(scenario %in% scenarios_3) %>%
+  dplyr::mutate(
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
@@ -156,8 +162,8 @@ model_human_3 <- model_preds_many_params_3 %>%
       support == "no.competitor+mostSimilar" ~ 'mostSimilar',
       support == "no.sameCat" ~ 'same category',
       support == "no.competitor+sameCat" ~ 'same category',
-      support == "no.otherCat" ~ 'other category'
-      support == "no.competitor+otherCat" ~ 'other category'
+      support == "no.otherCat" ~ 'other category',
+      support == "no.competitor+otherCat" ~ 'other category',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
@@ -176,7 +182,7 @@ model_human_3 <- model_preds_many_params_3 %>%
            relevanceBetaR1, costWeight, scenario) %>%
   mutate(prob = prob/sum(prob)) %>%
   ungroup() %>%
-  left_join(empirical_2_summary, by = c("scenario", "answerType")) %>%
+  left_join(empirical_3_summary, by = c("scenario", "answerType")) %>%
   replace_na(list(human_prop = 0))
 
 JSD_3 <- model_human_3 %>%
@@ -185,7 +191,8 @@ JSD_3 <- model_human_3 %>%
   mutate(JSD = JSD(rbind(prob, human_prop))) %>%
   ungroup()
 
-JSD_3 %>%
+
+min_JSDs_3 <- JSD_3 %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
            relevanceBetaR1, costWeight, scenario) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
@@ -194,6 +201,11 @@ JSD_3 %>%
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
-  slice_min(n = 20, order_by = JSD)
+  slice_min(n = 100, order_by = JSD)
 
+params_3 <- min_JSDs_3 %>%
+  summarise(mean(policyAlpha), mean(questionerAlpha), mean(R1Alpha), mean(relevanceBetaR0),
+            mean(relevanceBetaR1), mean(costWeight))
+
+write_csv(params_3, here("03-current-models-webppl/data/params_case_study_3.csv"))
 ```

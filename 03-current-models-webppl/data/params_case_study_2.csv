@@ -1,0 +1,2 @@
+mean(policyAlpha),mean(questionerAlpha),mean(R1Alpha),mean(relevanceBetaR0),mean(relevanceBetaR1),mean(costWeight)
+5.12,4.73,8.41,0.512,0.577,3.9500000000000006
