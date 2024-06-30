@@ -33,7 +33,7 @@ scale_fill_discrete <- function(...) {
 ```{r get-data, echo=FALSE}
 # get data for case study 2
 
-urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_QA-overinfo-freeTyping-cogsci_full_anonymized_categorized.csv"
+urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/results_e1_human_full_anonymized_categorized_cleaned.csv"
 raw_empirical_responses_2 <- read_csv(url(urlfile))
 scenarios_2 <- unique(raw_empirical_responses_2$itemName)
 
@@ -84,7 +84,7 @@ model_human_2 <- model_preds_many_params_2 %>%
       support == "no.competitor" ~ 'competitor',
       support == "no.competitor+sameCat" ~ 'same category',
       support == "no.sameCat" ~ 'same category',
-      support == "no.competitor+otherCat" ~ 'other category',
+      support == "no.competitor+otherCat" ~ 'other response',
       support == "no.otherCat" ~ 'other category',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
@@ -160,11 +160,18 @@ model_human_3 <- model_preds_many_params_3 %>%
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
       support == "no.mostSimilar" ~ 'mostSimilar',
-      support == "no.competitor+mostSimilar" ~ 'mostSimilar',
       support == "no.sameCat" ~ 'same category',
-      support == "no.competitor+sameCat" ~ 'same category',
       support == "no.otherCat" ~ 'other category',
-      support == "no.competitor+otherCat" ~ 'other category',
+      support == "no.competitor+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+otherCat" ~ 'same category',
+      support == "no.sameCat+otherCat" ~ 'same category',
+      support == "no.sameCat+mostSimilar" ~ 'same category',
+      support == "no.otherCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat" ~ 'same category',
+      support == "no.competitor+sameCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+otherCat+mostSimilar" ~ 'same category',
+      support == "no.sameCat+otherCat+mostSimilar" ~ 'same category',
       support == "no.competitor+sameCat+otherCat+mostSimilar" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)

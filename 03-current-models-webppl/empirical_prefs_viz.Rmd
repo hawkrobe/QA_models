@@ -34,7 +34,7 @@ urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-pr
 priors_2 <- read_csv(url(urlfile))
 scenarios_2 <- unique(priors_2$itemName)
 
-urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_QA-overinfo-freeTyping-cogsci_full_anonymized_categorized.csv"
+urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/results_e1_human_full_anonymized_categorized_cleaned.csv"
 raw_empirical_responses_2 <- read_csv(url(urlfile))
 
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E1-priorElicitation-sliderRating-full_450_anonymized.csv"
@@ -138,10 +138,10 @@ model_preds_2_summary <- model_preds_2 %>%
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
-      support == "no.sameCat" ~ 'same category',
       support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.sameCat" ~ 'same category',
+      support == "no.competitor+otherCat" ~ 'other response',
       support == "no.otherCat" ~ 'other category',
-      support == "no.competitor+otherCat" ~ 'other category',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
@@ -157,15 +157,22 @@ model_preds_3_summary <- model_preds_3 %>%
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
       support == "no.mostSimilar" ~ 'mostSimilar',
-      support == "no.competitor+mostSimilar" ~ 'mostSimilar',
       support == "no.sameCat" ~ 'same category',
-      support == "no.competitor+sameCat" ~ 'same category',
       support == "no.otherCat" ~ 'other category',
-      support == "no.competitor+otherCat" ~ 'other category',
+      support == "no.competitor+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+otherCat" ~ 'same category',
+      support == "no.sameCat+otherCat" ~ 'same category',
+      support == "no.sameCat+mostSimilar" ~ 'same category',
+      support == "no.otherCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat" ~ 'same category',
+      support == "no.competitor+sameCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+otherCat+mostSimilar" ~ 'same category',
+      support == "no.sameCat+otherCat+mostSimilar" ~ 'same category',
       support == "no.competitor+sameCat+otherCat+mostSimilar" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
-  ) 
+  )
 
 empirical_responses_2 <- raw_empirical_responses_2 %>%
   filter(trial_type != "filler") %>%
