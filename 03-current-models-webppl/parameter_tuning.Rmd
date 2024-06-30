@@ -44,7 +44,7 @@ model_preds_many_params_2 <-
 ########
 
 # get data for case study 3
-urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_e2_human_category_cleaned4modeling.csv"
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_e2_human_category_raw_cleaned.csv"
 raw_empirical_responses_3 <- read_csv(url(urlfile))
 scenarios_3 <- unique(raw_empirical_responses_3$itemName)
 
@@ -133,6 +133,8 @@ write_csv(params_2, here("03-current-models-webppl/data/params_case_study_2.csv"
 
 ```{r pick-params-3}
 empirical_3_summary <- raw_empirical_responses_3 %>%
+  filter(category != 'yes') %>%
+  filter(category != 'other') %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
       category == "taciturn" ~ 'taciturn',

@@ -49,7 +49,7 @@ urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-
 all_llm_preds_2 <- read_csv(url(urlfile))
 
 # get data for case study 3
-urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_e2_human_category_cleaned4modeling.csv"
+urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/results_e2_human_category_raw_cleaned.csv"
 raw_empirical_responses_3 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E2-priorElicitation-sliderRating-full_120.csv"
@@ -195,6 +195,8 @@ empirical_responses_2 <- raw_empirical_responses_2 %>%
   mutate(mean = n/sum(n)) 
 
 empirical_responses_3 <- raw_empirical_responses_3 %>%
+  filter(category != 'yes') %>%
+  filter(category != 'other') %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
       category == "taciturn" ~ 'taciturn',
