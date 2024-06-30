@@ -114,4 +114,3 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
 write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
-
