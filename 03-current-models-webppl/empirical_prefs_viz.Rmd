@@ -405,9 +405,16 @@ ggplot(all_summary, aes(x = agent, y = prop, fill = answerType)) +
                                    = 45, vjust = 1, hjust=1))
 ```
 
-```{r JSDs}
-by_item_all_agents_2 <- all_llm_preds_2 %>%
+# Evaluate context-sensitivity
 
+```{r}
+raw_empirical_responses_3 %>%
+  arrange(settingName, context_nr) %>%
+  rowwise() %>%
+  mutate(mentioned_c1 = grepl( 'c1', powerset_member, fixed=TRUE),
+         mentioned_c2 = grepl( 'c2', powerset_member, fixed=TRUE)) %>%
+  group_by(context_nr) %>%
+  summarize(mentioned_c1 = mean(mentioned_c1),
+            mentioned_c2 = mean(mentioned_c2))  
   
-
 ```
