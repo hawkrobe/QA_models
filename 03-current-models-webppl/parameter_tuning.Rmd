@@ -164,7 +164,7 @@ model_human_3 <- model_preds_many_params_3 %>%
       support == "no.competitor+sameCat" ~ 'same category',
       support == "no.otherCat" ~ 'other category',
       support == "no.competitor+otherCat" ~ 'other category',
-      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      support == "no.competitor+sameCat+otherCat+mostSimilar" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
