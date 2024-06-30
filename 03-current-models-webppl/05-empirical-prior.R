@@ -68,13 +68,13 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 0, max = 10), #0-10
-    'questionerAlpha'  = runif(1,min = 0, max = 10), #0-10
-    'R1Alpha'          = runif(1,min = 0, max = 10), #0-10
-    'relevanceBetaR0'  = runif(1,min = 0, max = 1), #0-1
-    'relevanceBetaR1'  = runif(1,min = 0, max = 1), #0-1
-    'costWeight'       = runif(1,min = 0, max = 5), #0-5
-    'questionCost'     = runif(1,min = 0, max = 0) #0
+    'policyAlpha'      = runif(1,min = 5.1, max = 5.1), # searched 0-10
+    'questionerAlpha'  = runif(1,min = 4.7, max = 4.7), # searched 0-10
+    'R1Alpha'          = runif(1,min = 8.4, max = 8.4), # searched 0-10
+    'relevanceBetaR0'  = runif(1,min = 0.51, max = 0.51), # searched 0-1
+    'relevanceBetaR1'  = runif(1,min = 0.58, max = 0.58), # searched 0-1
+    'costWeight'       = runif(1,min = 4.0, max = 4.0), # searched 0-5
+    'questionCost'     = runif(1,min = 0, max = 0) # fixed at 0
   )
   return(params)
 }
@@ -96,7 +96,7 @@ empiricalPrior <- function(scenario) {
 }
 
 # run samples in parallel 
-samples_each = 1000
+samples_each = 5#00 # 1000 for param search
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
@@ -113,4 +113,5 @@ priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
+#write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
+write_csv(priorPred, './03-current-models-webppl/data/case_study_2_RSA_preds.csv')
