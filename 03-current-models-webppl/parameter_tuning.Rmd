@@ -12,6 +12,7 @@ library(readr)
 library(furrr)
 library(here)
 library(philentropy)
+library(here)
 
 
 # use the aida-theme for plotting
@@ -48,11 +49,10 @@ raw_empirical_responses_3 <- read_csv(url(urlfile))
 scenarios_3 <- unique(raw_empirical_responses_3$itemName)
 
 # RSA preds over many parameter values
-model_preds_many_params_3 <-
-  read_csv(here('03-current-models-webppl/data/case_study_3_parameter_search.csv'))
+model_preds_many_params_3 <- read_csv(here('03-current-models-webppl/data/case_study_3_parameter_search.csv'))
 ```
 
-```{r likelihoods}
+```{r pick-params-2}
 answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive', 'unclassified', 'other response')
 
 empirical_2_summary <- raw_empirical_responses_2 %>%
@@ -89,12 +89,12 @@ model_human_2 <- model_preds_many_params_2 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = round(policyAlpha, 1),
-         questionerAlpha = round(questionerAlpha, 1),
-         R1Alpha = round(R1Alpha, 1),
-         relevanceBetaR0 = round(relevanceBetaR0, 2),
-         relevanceBetaR1 = round(relevanceBetaR1, 2),
-         costWeight = round(costWeight, 1)) %>%
+  mutate(policyAlpha = round(policyAlpha, 0),
+         questionerAlpha = round(questionerAlpha, 0),
+         R1Alpha = round(R1Alpha, 0),
+         relevanceBetaR0 = round(relevanceBetaR0, 1),
+         relevanceBetaR1 = round(relevanceBetaR1, 1),
+         costWeight = round(costWeight, 0)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
            relevanceBetaR1, costWeight, answerType, scenario) %>%
   summarise(prob = sum(prob)) %>%
@@ -107,8 +107,93 @@ model_human_2 <- model_preds_many_params_2 %>%
   replace_na(list(human_prop = 0))
 
 JSD_2 <- model_human_2 %>%
+  group_by(scenario, policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight) %>%
+  mutate(JSD = JSD(rbind(prob, human_prop))) %>%
+  ungroup()
+
+JSD_2 %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight, scenario) %>%
+  summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
+  ungroup() %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight) %>%
+  summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
+  ungroup() %>%
+  slice_min(n = 20, order_by = JSD)
+```
+
+```{r pick-params-3}
+empirical_3_summary <- raw_empirical_responses_3 %>%
+  filter(trial_type != "filler") %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>% 
+  rename(scenario = itemName) %>%
+  group_by(scenario, answerType) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(human_prop = n/sum(n)) %>%
+  select(-n)
+
+model_human_3 <- model_preds_many_params_3 %>%
+    dplyr::mutate(
+    answerType = dplyr::case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.mostSimilar" ~ 'mostSimilar',
+      support == "no.competitor+mostSimilar" ~ 'mostSimilar',
+      support == "no.sameCat" ~ 'same category',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.otherCat" ~ 'other category'
+      support == "no.competitor+otherCat" ~ 'other category'
+      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>%
+  mutate(policyAlpha = round(policyAlpha, 0),
+         questionerAlpha = round(questionerAlpha, 0),
+         R1Alpha = round(R1Alpha, 0),
+         relevanceBetaR0 = round(relevanceBetaR0, 1),
+         relevanceBetaR1 = round(relevanceBetaR1, 1),
+         costWeight = round(costWeight, 0)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
            relevanceBetaR1, costWeight, answerType, scenario) %>%
-  mutate(JSD = JSD(rbind(prob, human_prop)))
+  summarise(prob = sum(prob)) %>%
+  ungroup() %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight, scenario) %>%
+  mutate(prob = prob/sum(prob)) %>%
+  ungroup() %>%
+  left_join(empirical_2_summary, by = c("scenario", "answerType")) %>%
+  replace_na(list(human_prop = 0))
+
+JSD_3 <- model_human_3 %>%
+  group_by(scenario, policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight) %>%
+  mutate(JSD = JSD(rbind(prob, human_prop))) %>%
+  ungroup()
+
+JSD_3 %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight, scenario) %>%
+  summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
+  ungroup() %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+           relevanceBetaR1, costWeight) %>%
+  summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
+  ungroup() %>%
+  slice_min(n = 20, order_by = JSD)
 
 ```

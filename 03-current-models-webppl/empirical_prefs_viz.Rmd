@@ -153,9 +153,14 @@ model_preds_3_summary <- model_preds_3 %>%
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
+      support == "no.mostSimilar" ~ 'mostSimilar',
+      support == "no.competitor+mostSimilar" ~ 'mostSimilar',
+      support == "no.sameCat" ~ 'same category',
       support == "no.competitor+sameCat" ~ 'same category',
-      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       support == "no.otherCat" ~ 'other category'
+      support == "no.competitor+otherCat" ~ 'other category'
+      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) 
 
