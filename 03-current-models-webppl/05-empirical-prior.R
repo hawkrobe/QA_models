@@ -96,7 +96,7 @@ empiricalPrior <- function(scenario) {
 }
 
 # run samples in parallel 
-samples_each = 5#00 # 1000 for param search
+samples_each = 500 # 1000 for param search
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
