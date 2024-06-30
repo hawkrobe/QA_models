@@ -85,8 +85,11 @@ var makeR = function(){
         var response = sample(R1Prediction);
         var match = response == 'no.---' ? true :
             response == 'no.competitor' ? true :
-            response == 'no.competitor+sameCat' ? true :
+            response == 'no.sameCat' ? true :
             response == 'no.otherCat' ? true :
+            response == 'no.competitor+sameCat' ? true :
+            response == 'no.competitor+otherCat' ? true :
+            response == 'no.sameCat+otherCat' ? true :
             response == 'no.competitor+sameCat+otherCat' ? true : false
         condition(match)
         return(response)
