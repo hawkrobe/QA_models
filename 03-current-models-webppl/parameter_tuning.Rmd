@@ -234,6 +234,7 @@ empirical_2_summary_overall <- raw_empirical_responses_2 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>% 
+  filter(answerType != "other response") %>%
   rename(scenario = itemName) %>%
   group_by(scenario, answerType) %>%
   summarise(n = n()) %>%
@@ -259,11 +260,12 @@ model_human_2_overall <- model_preds_many_params_2 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = cut(policyAlpha, breaks = 10),
-         questionerAlpha = cut(questionerAlpha, breaks = 10),
-         R1Alpha = cut(R1Alpha, breaks = 10),
-         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 10),
-         costWeight = cut(costWeight, breaks = 10)) %>%
+  filter(answerType != "other response") %>%
+  mutate(policyAlpha = cut(policyAlpha, breaks = 5),
+         questionerAlpha = cut(questionerAlpha, breaks = 5),
+         R1Alpha = cut(R1Alpha, breaks = 5),
+         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 5),
+         costWeight = cut(costWeight, breaks = 5)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, answerType) %>%
   summarise(prob = sum(prob)) %>%
@@ -272,8 +274,19 @@ model_human_2_overall <- model_preds_many_params_2 %>%
            relevanceBetaR1, costWeight) %>%
   mutate(prob = prob/sum(prob)) %>%
   ungroup() %>%
+  complete(answerType, nesting(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight)) %>%
   left_join(empirical_2_summary_overall, by = c("answerType")) %>%
-  replace_na(list(human_prop = 0))
+  replace_na(list(human_prop = 0, prob = 0))
+
+model_human_2_overall %>%
+  group_by(answerType) %>%
+  summarise(human = sum(human_prop), model = sum(prob))
+
+model_human_2_overall %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight) %>%
+  summarise(human = sum(human_prop), model = sum(prob)) %>% View()
 
 JSD_2_overall <- model_human_2_overall %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha,
@@ -341,11 +354,11 @@ model_human_3_overall <- model_preds_many_params_3 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = cut(policyAlpha, breaks = 10),
-         questionerAlpha = cut(questionerAlpha, breaks = 10),
-         R1Alpha = cut(R1Alpha, breaks = 10),
-         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 10),
-         costWeight = cut(costWeight, breaks = 10)) %>%
+  mutate(policyAlpha = cut(policyAlpha, breaks = 5),
+         questionerAlpha = cut(questionerAlpha, breaks = 5),
+         R1Alpha = cut(R1Alpha, breaks = 5),
+         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 5),
+         costWeight = cut(costWeight, breaks = 5)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, answerType) %>%
   summarise(prob = sum(prob)) %>%
@@ -354,8 +367,15 @@ model_human_3_overall <- model_preds_many_params_3 %>%
            relevanceBetaR1, costWeight) %>%
   mutate(prob = prob/sum(prob)) %>%
   ungroup() %>%
+  complete(answerType, nesting(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight)) %>%
   left_join(empirical_3_summary_overall, by = c("answerType")) %>%
-  replace_na(list(human_prop = 0))
+  replace_na(list(human_prop = 0, prob = 0)) 
+
+model_human_3_overall %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight) %>%
+  summarise(human = sum(human_prop), model = sum(prob)) %>% View()
 
 JSD_3_overall <- model_human_3_overall %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
@@ -374,6 +394,14 @@ write_csv(params_3_overall, here("03-current-models-webppl/data/params_case_stud
 ```
 
 ```{r}
+model_human_2_overall %>%
+  select(answerType, prob, human_prop) %>%
+  pivot_longer(cols = c(prob, human_prop), names_to = "agent", values_to = "prop") %>%
+  ggplot(aes(x = agent, y = prop, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") +
+  scale_x_discrete(drop = TRUE) +
+  theme(axis.text.x = element_text(angle 
+                                   = 45, vjust = 1, hjust=1))
 model_human_3_overall %>%
   select(answerType, prob, human_prop) %>%
   pivot_longer(cols = c(prob, human_prop), names_to = "agent", values_to = "prop") %>%
