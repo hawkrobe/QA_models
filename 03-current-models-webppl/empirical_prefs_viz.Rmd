@@ -64,10 +64,7 @@ llm_preds_3 <- read_csv(url(urlfile))
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e2_llms_results.csv"
 all_llm_preds_3 <- read_csv(url(urlfile))
 
-model_preds_2 <-
-  read_csv(here('03-current-models-webppl/data/case_study_2_parameter_search.csv'))
 
-model_preds_3 <- read_csv(here('03-current-models-webppl/data/case_study_3_parameter_search.csv'))
 ```
 
 ```{r data-cleaning}
@@ -218,6 +215,7 @@ empirical_responses_3 <- raw_empirical_responses_3 %>%
   rename(scenario = itemName) %>%
   count(scenario, answerType) %>%
   ungroup() %>%
+  filter(answerType != "other response") %>%
   filter(!is.na(answerType)) %>%
   group_by(scenario) %>%
   mutate(mean = n/sum(n)) 
