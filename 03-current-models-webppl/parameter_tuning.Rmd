@@ -85,7 +85,7 @@ model_human_2 <- model_preds_many_params_2 %>%
       support == "no.sameCat" ~ 'same category',
       support == "no.competitor+otherCat" ~ 'other response',
       support == "no.otherCat" ~ 'other category',
-      support == "no.sameCat+otherCat" ~ 'other category',
+      support == "no.sameCat+otherCat" ~ 'other response',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
@@ -162,7 +162,7 @@ model_human_3 <- model_preds_many_params_3 %>%
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
-      support == "no.mostSimilar" ~ 'mostSimilar',
+      support == "no.mostSimilar" ~ 'most similar',
       support == "no.sameCat" ~ 'same category',
       support == "no.otherCat" ~ 'other category',
       support == "no.competitor+mostSimilar" ~ 'same category',
@@ -245,6 +245,7 @@ empirical_2_summary_overall <- raw_empirical_responses_2 %>%
   mutate(human_prop = human_prop/sum(human_prop)) 
 
 model_human_2_overall <- model_preds_many_params_2 %>%
+  select(-relevanceBetaR0) %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
@@ -253,22 +254,21 @@ model_human_2_overall <- model_preds_many_params_2 %>%
       support == "no.sameCat" ~ 'same category',
       support == "no.competitor+otherCat" ~ 'other category',
       support == "no.otherCat" ~ 'other category',
-      support == "no.sameCat+otherCat" ~ 'other category',
+      support == "no.sameCat+otherCat" ~ 'other response',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = round(policyAlpha, 0),
-         questionerAlpha = round(questionerAlpha, 0),
-         R1Alpha = round(R1Alpha, 0),
-         relevanceBetaR0 = round(relevanceBetaR0, 1),
-         relevanceBetaR1 = round(relevanceBetaR1, 1),
-         costWeight = round(costWeight, 0)) %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  mutate(policyAlpha = cut(policyAlpha, breaks = 10),
+         questionerAlpha = cut(questionerAlpha, breaks = 10),
+         R1Alpha = cut(R1Alpha, breaks = 10),
+         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 10),
+         costWeight = cut(costWeight, breaks = 10)) %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, answerType) %>%
   summarise(prob = sum(prob)) %>%
   ungroup() %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight) %>%
   mutate(prob = prob/sum(prob)) %>%
   ungroup() %>%
@@ -276,17 +276,17 @@ model_human_2_overall <- model_preds_many_params_2 %>%
   replace_na(list(human_prop = 0))
 
 JSD_2_overall <- model_human_2_overall %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha,
            relevanceBetaR1, costWeight) %>%
   mutate(JSD = JSD(rbind(prob, human_prop))) %>%
   ungroup()
 
 params_2_overall <- JSD_2_overall %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha,
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
-  slice_min(n = 1, order_by = JSD)
+  slice_min(n = 10, order_by = JSD)
 
 write_csv(params_2_overall, here("03-current-models-webppl/data/params_case_study_2_overall.csv"))
 ```
@@ -324,7 +324,7 @@ model_human_3_overall <- model_preds_many_params_3 %>%
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
-      support == "no.mostSimilar" ~ 'mostSimilar',
+      support == "no.mostSimilar" ~ 'most similar',
       support == "no.sameCat" ~ 'same category',
       support == "no.otherCat" ~ 'other category',
       support == "no.competitor+mostSimilar" ~ 'same category',
@@ -371,4 +371,15 @@ params_3_overall <- JSD_3_overall %>%
   slice_min(n = 10, order_by = JSD)
 
 write_csv(params_3_overall, here("03-current-models-webppl/data/params_case_study_3_overall.csv"))
+```
+
+```{r}
+model_human_3_overall %>%
+  select(answerType, prob, human_prop) %>%
+  pivot_longer(cols = c(prob, human_prop), names_to = "agent", values_to = "prop") %>%
+  ggplot(aes(x = agent, y = prop, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") +
+  scale_x_discrete(drop = TRUE) +
+  theme(axis.text.x = element_text(angle 
+                                   = 45, vjust = 1, hjust=1))
 ```

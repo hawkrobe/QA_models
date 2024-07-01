@@ -63,6 +63,11 @@ llm_preds_3 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e2_llms_results.csv"
 all_llm_preds_3 <- read_csv(url(urlfile))
+
+model_preds_2 <-
+  read_csv(here('03-current-models-webppl/data/case_study_2_parameter_search.csv'))
+
+model_preds_3 <- read_csv(here('03-current-models-webppl/data/case_study_3_parameter_search.csv'))
 ```
 
 ```{r data-cleaning}
@@ -142,7 +147,7 @@ model_preds_2_summary <- model_preds_2 %>%
       support == "no.sameCat" ~ 'same category',
       support == "no.competitor+otherCat" ~ 'other response',
       support == "no.otherCat" ~ 'other category',
-      support == "no.sameCat+otherCat" ~ 'other category',
+      support == "no.sameCat+otherCat" ~ 'other response',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
@@ -157,7 +162,7 @@ model_preds_3_summary <- model_preds_3 %>%
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
-      support == "no.mostSimilar" ~ 'mostSimilar',
+      support == "no.mostSimilar" ~ 'most similar',
       support == "no.sameCat" ~ 'same category',
       support == "no.otherCat" ~ 'other category',
       support == "no.competitor+mostSimilar" ~ 'same category',
