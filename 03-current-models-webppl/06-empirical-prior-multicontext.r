@@ -51,12 +51,12 @@ run_model_tsos <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 3.5, max = 4), # searched 0-10
-    'questionerAlpha'  = runif(1,min = 2.5, max = 3), # searched 0-10
-    'R1Alpha'          = runif(1,min = 1, max = 1.5), # searched 0-10
+    'policyAlpha'      = runif(1,min = 3, max = 4), # searched 0-10
+    'questionerAlpha'  = runif(1,min = 2, max = 3), # searched 0-10
+    'R1Alpha'          = runif(1,min = 1, max = 2), # searched 0-10
     'relevanceBetaR0'  = runif(1,min = 0, max = 0), # fixed at 0
-    'relevanceBetaR1'  = runif(1,min = 0.05, max = 0.1), # searched 0-1
-    'costWeight'       = runif(1,min = 4, max = 4.25), # searched 0-5
+    'relevanceBetaR1'  = runif(1,min = 0, max = 0.1), # searched 0-1
+    'costWeight'       = runif(1,min = 4, max = 4.5), # searched 0-5
     'questionCost'     = runif(1,min = 0, max = 0) # fixed at 0
   )
   return(params)
