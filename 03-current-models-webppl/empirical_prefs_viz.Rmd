@@ -142,6 +142,7 @@ model_preds_2_summary <- model_preds_2 %>%
       support == "no.sameCat" ~ 'same category',
       support == "no.competitor+otherCat" ~ 'other response',
       support == "no.otherCat" ~ 'other category',
+      support == "no.sameCat+otherCat" ~ 'other category',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
@@ -172,7 +173,7 @@ model_preds_3_summary <- model_preds_3 %>%
       support == "no.competitor+sameCat+otherCat+mostSimilar" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
-  )
+  ) 
 
 empirical_responses_2 <- raw_empirical_responses_2 %>%
   filter(trial_type != "filler") %>%
