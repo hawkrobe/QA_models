@@ -13,6 +13,7 @@ library(furrr)
 library(here)
 library(philentropy)
 library(here)
+library(feather)
 
 
 # use the aida-theme for plotting
@@ -38,8 +39,8 @@ raw_empirical_responses_2 <- read_csv(url(urlfile))
 scenarios_2 <- unique(raw_empirical_responses_2$itemName)
 
 # RSA preds over many parameter values
-model_preds_many_params_2 <-
-  read_csv(here('03-current-models-webppl/data/case_study_2_parameter_search.csv'))
+urlfile = "https://raw.githubusercontent.com/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_2_parameter_search.csv"
+model_preds_many_params_2 <- read_csv(url(urlfile))
 
 ########
 
@@ -49,7 +50,8 @@ raw_empirical_responses_3 <- read_csv(url(urlfile))
 scenarios_3 <- unique(raw_empirical_responses_3$itemName)
 
 # RSA preds over many parameter values
-model_preds_many_params_3 <- read_csv(here('03-current-models-webppl/data/case_study_3_parameter_search.csv'))
+urlfile = "https://media.githubusercontent.com/media/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_3_parameter_search.csv"
+model_preds_many_params_3 <- read_csv(url(urlfile))
 
 answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive', 'unclassified', 'other response')
 ```
@@ -68,6 +70,7 @@ empirical_2_summary <- raw_empirical_responses_2 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>% 
+  filter(answerType != "other response") %>%
   rename(scenario = itemName) %>%
   group_by(scenario, answerType) %>%
   summarise(n = n()) %>%
@@ -77,48 +80,51 @@ empirical_2_summary <- raw_empirical_responses_2 %>%
   select(-n)
 
 model_human_2 <- model_preds_many_params_2 %>%
+  select(-relevanceBetaR0) %>%
   dplyr::mutate(
     answerType = dplyr::case_when(
       support == "no.---" ~ 'taciturn',
       support == "no.competitor" ~ 'competitor',
       support == "no.competitor+sameCat" ~ 'same category',
       support == "no.sameCat" ~ 'same category',
-      support == "no.competitor+otherCat" ~ 'other response',
+      support == "no.competitor+otherCat" ~ 'other category',
       support == "no.otherCat" ~ 'other category',
       support == "no.sameCat+otherCat" ~ 'other response',
       support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = round(policyAlpha, 0),
-         questionerAlpha = round(questionerAlpha, 0),
-         R1Alpha = round(R1Alpha, 0),
-         relevanceBetaR0 = round(relevanceBetaR0, 1),
-         relevanceBetaR1 = round(relevanceBetaR1, 1),
-         costWeight = round(costWeight, 0)) %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
-           relevanceBetaR1, costWeight, answerType, scenario) %>%
+  filter(answerType != "other response") %>%
+  mutate(policyAlpha = cut(policyAlpha, breaks = 5),
+         questionerAlpha = cut(questionerAlpha, breaks = 5),
+         R1Alpha = cut(R1Alpha, breaks = 5),
+         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 5),
+         costWeight = cut(costWeight, breaks = 5)) %>%
+  group_by(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight, scenario, answerType) %>%
   summarise(prob = sum(prob)) %>%
   ungroup() %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, scenario) %>%
   mutate(prob = prob/sum(prob)) %>%
   ungroup() %>%
+  complete(answerType, nesting(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight, scenario)) %>%
   left_join(empirical_2_summary, by = c("scenario", "answerType")) %>%
-  replace_na(list(human_prop = 0))
+  replace_na(list(human_prop = 0, prob = 0))
 
 JSD_2 <- model_human_2 %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha,  
            relevanceBetaR1, costWeight, scenario) %>%
   mutate(JSD = JSD(rbind(prob, human_prop))) %>%
   ungroup()
 
 min_JSDs_2 <- JSD_2 %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha,
            relevanceBetaR1, costWeight, scenario) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
   ungroup() %>%
-  group_by(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, 
+  group_by(policyAlpha, questionerAlpha, R1Alpha,  
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
@@ -354,11 +360,6 @@ model_human_3_overall <- model_preds_many_params_3 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = cut(policyAlpha, breaks = 5),
-         questionerAlpha = cut(questionerAlpha, breaks = 5),
-         R1Alpha = cut(R1Alpha, breaks = 5),
-         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 5),
-         costWeight = cut(costWeight, breaks = 5)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, answerType) %>%
   summarise(prob = sum(prob)) %>%
@@ -388,7 +389,7 @@ params_3_overall <- JSD_3_overall %>%
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
-  slice_min(n = 10, order_by = JSD)
+  slice_min(n = 1, order_by = JSD)
 
 write_csv(params_3_overall, here("03-current-models-webppl/data/params_case_study_3_overall.csv"))
 ```
@@ -410,4 +411,32 @@ model_human_3_overall %>%
   scale_x_discrete(drop = TRUE) +
   theme(axis.text.x = element_text(angle 
                                    = 45, vjust = 1, hjust=1))
+
+model_human_3_overall %>%
+  filter(policyAlpha %in% params_3_overall$policyAlpha &
+         questionerAlpha %in% params_3_overall$questionerAlpha &
+         R1Alpha %in% params_3_overall$R1Alpha &
+         relevanceBetaR1 %in% params_3_overall$relevanceBetaR1 &
+         costWeight %in% params_3_overall$costWeight) %>%
+  select(answerType, prob, human_prop) %>%
+  pivot_longer(cols = c(prob, human_prop), names_to = "agent", values_to = "prop") %>%
+  ggplot(aes(x = agent, y = prop, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") +
+  scale_x_discrete(drop = TRUE) +
+  theme(axis.text.x = element_text(angle 
+                                   = 45, vjust = 1, hjust=1))
+
+```
+
+```{r}
+policyAlpha = c(0,2,4,6,8,10)
+questionerAlpha = c(0,2,4,6,8,10)
+R1Alpha = c(0,2,4,6,8,10)
+relevanceBetaR0 = c(0)
+relevanceBetaR1 = c(0, 0.2, 0.4, 0.6, 0.8, 1)
+costWeight = c(0, 0.2, 0.4, 0.6, 0.8, 1)
+
+param_space <- expand_grid(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, relevanceBetaR1, costWeight)
+
+param_space[1,]
 ```
