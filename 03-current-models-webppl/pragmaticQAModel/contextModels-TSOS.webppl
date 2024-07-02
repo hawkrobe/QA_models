@@ -22,13 +22,14 @@ var tsosContext = {
     {type: 'wh', queried: tsosAtoms, text: 'Which elements?'},
   ],
   questionerBeliefs: Categorical({vs: tsosPowerSet}),
-  R0PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
-  R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat'}),
+  R0PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat+mostSimilar'}),
+  R1PriorOverWorlds: Delta({v: 'competitor+sameCat+otherCat+mostSimilar'}),
   decisionProblem: function(w, a) {
     return _.includes(w, a) ?
                      (a == 'target'     ? 50 :
                       a == 'competitor' ? 25  :
                       a == 'sameCat'    ? 4  :
+                      a == 'otherCat'    ? 4  :
                       a == 'mostSimilar'    ? 4  :
                                           1) :
                0.0001;

@@ -3,6 +3,7 @@ library(tidyverse)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 library(readr)
 library(furrr)
+library(feather)
 
 ##################################################
 
@@ -32,7 +33,22 @@ empirical_responses <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E2-priorElicitation-sliderRating-full_120.csv"
 priors <- read_csv(url(urlfile))
-scenarios <- unique(priors$itemName)
+scenarios <- unique(empirical_responses$itemName)
+
+#######################################
+
+policyAlpha = c(1,3,5,7,9)
+questionerAlpha = c(1,3,5,7,9)
+R1Alpha = c(1,3,5,7,9)
+relevanceBetaR0 = c(0)
+relevanceBetaR1 = c(0.1, 0.3, 0.5, 0.7, 0.9)
+costWeight = c(0.1, 0.3, 0.5, 0.7, 0.9)
+n_sample <- c(1,2,3,4,5)
+questionCost <- c(0)
+
+param_space <- expand_grid(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, relevanceBetaR1, costWeight, questionCost, scenarios, n_sample)
+
+##############################################
 
 run_model_tsos <- function (params, utils) {
   webPPL_data <- tibble('task' = "TSOS") %>% 
@@ -83,19 +99,33 @@ samples_each = 200 # 1000 for param search
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
+
+param_search = TRUE
+
 plan(multisession, workers = 100)
+
+if (param_search == TRUE) {
+  n_samples = nrow(param_space)
+}
 priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
   message('run ', i)
-  scenario = scenarios_rep[i]
-  params <- priorSampleParams()
+  if (param_search == TRUE) {
+    scenario <- param_space[i,]['scenarios'] %>% pull()
+    params <- param_space[i,] %>% select(-scenarios, -n_sample) %>% tibble()
+  } else {
+    scenario = scenarios_rep[i]
+    params <- priorSampleParams()
+  }
   utils  <- empiricalPrior(scenario)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(scenario) %>%
     cbind(run_model_tsos(params, utils))
-  return (out)
+    return (out)
 }, .progress = TRUE, .options = furrr_options(seed = 123))
 
-#write_csv(priorPred, './03-current-models-webppl/data/case_study_3_parameter_search.csv')
-write_csv(priorPred, './03-current-models-webppl/data/case_study_3_RSA_preds.csv')
+
+write_feather(priorPred, './03-current-models-webppl/data/case_study_3_parameter_search.feather')
+write_csv(priorPred, './03-current-models-webppl/data/case_study_3_parameter_search.csv')
+#write_csv(priorPred, './03-current-models-webppl/data/case_study_3_RSA_preds.csv')
 

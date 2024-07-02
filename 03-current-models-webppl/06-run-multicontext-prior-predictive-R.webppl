@@ -27,8 +27,8 @@ var makeR = function(){
         return _.includes(w, a) ?
           (a == 'target' ? RInput[0].utilTarget :
            a == 'competitor' ? RInput[0].utilCompetitor :
-           a == 'mostSimilar' ? RInput[0].utilMostSimilar :
-           a == 'sameCat' ? RInput[0].utilSameCat : RInput[0].utilOtherCat) :
+           a == 'sameCat' ? RInput[0].utilSameCat :
+           a == 'otherCat' ? RInput[0].utilOtherCat : RInput[0].utilMostSimilar) :
           0.0000001;
       }}
     )

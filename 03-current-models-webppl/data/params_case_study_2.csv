@@ -1,2 +1,3 @@
-mean(policyAlpha),mean(questionerAlpha),mean(R1Alpha),mean(relevanceBetaR0),mean(relevanceBetaR1),mean(costWeight)
-5.12,4.73,8.41,0.512,0.577,3.9500000000000006
+version https://git-lfs.github.com/spec/v1
+oid sha256:0fb087dda61ccd6dd74de53747f6ab98dc30e79f7049af1e274ae34e4891f132
+size 161

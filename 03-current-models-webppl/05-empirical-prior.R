@@ -3,6 +3,7 @@ library(tidyverse)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 library(readr)
 library(furrr)
+library(feather)
 
 ##################################################
 
@@ -50,6 +51,20 @@ full_matrix %>%
   count(itemName, targetOption) 
 
 #################################################
+
+
+policyAlpha = c(2,4,6,8,10)
+questionerAlpha = c(2,4,6,8,10)
+R1Alpha = c(2,4,6,8,10)
+relevanceBetaR0 = c(0)
+relevanceBetaR1 = c(0.2, 0.4, 0.6, 0.8, 1)
+costWeight = c(1, 2, 3, 4, 5)
+n_sample <- c(1,2,3,4,5)
+questionCost <- c(0)
+
+param_space <- expand_grid(policyAlpha, questionerAlpha, R1Alpha, relevanceBetaR0, relevanceBetaR1, costWeight, questionCost, scenarios, n_sample)
+
+##############################################
 
 run_model_tso <- function (params, utils) {
   webPPL_data <- tibble('task' = "TSO") %>% 
@@ -101,17 +116,31 @@ scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
 plan(multisession, workers = 100)
-priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
-  message('run ', i)
-  scenario = scenarios_rep[i]
-  params <- priorSampleParams()
-  utils  <- empiricalPrior(scenario)
-  out    <- tibble('run' = i) %>%
-    cbind(params) %>%
-    cbind(scenario) %>%
-    cbind(run_model_tso(params, utils))
-  return (out)
-}, .progress = TRUE, .options = furrr_options(seed = 123))
 
-#write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
-write_csv(priorPred, './03-current-models-webppl/data/case_study_2_RSA_preds.csv')
+get_sample <- function(param_search = FALSE) {
+  if (param_search == TRUE) {
+    n_samples = nrow(param_space)
+  }
+  priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
+    message('run ', i)
+    if (param_search == TRUE) {
+      scenario <- param_space[i,]['scenarios'] %>% pull()
+      params <- param_space[i,] %>% select(-scenarios, -n_sample) %>% tibble()
+    } else {
+      scenario = scenarios_rep[i]
+      params <- priorSampleParams()
+    }
+    utils  <- empiricalPrior(scenario)
+    out    <- tibble('run' = i) %>%
+      cbind(params) %>%
+      cbind(scenario) %>%
+      cbind(run_model_tso(params, utils))
+      return (out)
+  }, .progress = TRUE, .options = furrr_options(seed = 123))
+  return(priorPred)
+}
+
+priorPred <- get_sample(param_search = TRUE)
+
+write_feather(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.feather')
+#write_csv(priorPred, './03-current-models-webppl/data/case_study_2_RSA_preds.csv')
