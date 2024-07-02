@@ -53,12 +53,12 @@ full_matrix %>%
 #################################################
 
 
-policyAlpha = c(2,4,6,8,10)
-questionerAlpha = c(2,4,6,8,10)
-R1Alpha = c(2,4,6,8,10)
+policyAlpha = c(1,3,5,7,9)
+questionerAlpha = c(1,3,5,7,9)
+R1Alpha = c(1,3,5,7,9)
 relevanceBetaR0 = c(0)
-relevanceBetaR1 = c(0.2, 0.4, 0.6, 0.8, 1)
-costWeight = c(1, 2, 3, 4, 5)
+relevanceBetaR1 = c(0.1, 0.3, 0.5, 0.7, 0.9)
+costWeight = c(0.1, 0.3, 0.5, 0.7, 0.9)
 n_sample <- c(1,2,3,4,5)
 questionCost <- c(0)
 
