@@ -1,3 +1,2 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f1c2fdeca6e7307041d96093669a1bf47ce539e1399caa92e65b80b067befa63
-size 174
+policyAlpha,questionerAlpha,R1Alpha,relevanceBetaR1,costWeight,JSD
+3,5,9,0.1,0.9,0.1568309550794761

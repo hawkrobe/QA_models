@@ -39,7 +39,7 @@ raw_empirical_responses_2 <- read_csv(url(urlfile))
 scenarios_2 <- unique(raw_empirical_responses_2$itemName)
 
 # RSA preds over many parameter values
-urlfile = "https://raw.githubusercontent.com/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_2_parameter_search.csv"
+urlfile = "https://media.githubusercontent.com/media/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_2_parameter_search.csv"
 model_preds_many_params_2 <- read_csv(url(urlfile))
 
 ########
@@ -95,11 +95,6 @@ model_human_2 <- model_preds_many_params_2 %>%
     ) %>% factor(levels = answerOrder)
   ) %>%
   filter(answerType != "other response") %>%
-  mutate(policyAlpha = cut(policyAlpha, breaks = 5),
-         questionerAlpha = cut(questionerAlpha, breaks = 5),
-         R1Alpha = cut(R1Alpha, breaks = 5),
-         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 5),
-         costWeight = cut(costWeight, breaks = 5)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, scenario, answerType) %>%
   summarise(prob = sum(prob)) %>%
@@ -119,7 +114,7 @@ JSD_2 <- model_human_2 %>%
   mutate(JSD = JSD(rbind(prob, human_prop))) %>%
   ungroup()
 
-min_JSDs_2 <- JSD_2 %>%
+params_2 <- JSD_2 %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha,
            relevanceBetaR1, costWeight, scenario) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
@@ -128,11 +123,7 @@ min_JSDs_2 <- JSD_2 %>%
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
-  slice_min(n = 100, order_by = JSD)
-
-params_2 <- min_JSDs_2 %>%
-  summarise(mean(policyAlpha), mean(questionerAlpha), mean(R1Alpha), mean(relevanceBetaR0),
-            mean(relevanceBetaR1), mean(costWeight))
+  slice_min(n = 1, order_by = JSD)
 
 write_csv(params_2, here("03-current-models-webppl/data/params_case_study_2.csv"))
 ```
@@ -185,11 +176,6 @@ model_human_3 <- model_preds_many_params_3 %>%
       .default = "other response"
     ) %>% factor(levels = answerOrder)
   ) %>%
-  mutate(policyAlpha = cut(policyAlpha, breaks = 10),
-         questionerAlpha = cut(questionerAlpha, breaks = 10),
-         R1Alpha = cut(R1Alpha, breaks = 10),
-         relevanceBetaR1 = cut(relevanceBetaR1, breaks = 10),
-         costWeight = cut(costWeight, breaks = 10)) %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha,
            relevanceBetaR1, costWeight, answerType, scenario) %>%
   summarise(prob = sum(prob)) %>%
@@ -198,8 +184,10 @@ model_human_3 <- model_preds_many_params_3 %>%
            relevanceBetaR1, costWeight, scenario) %>%
   mutate(prob = prob/sum(prob)) %>%
   ungroup() %>%
+  complete(answerType, nesting(policyAlpha, questionerAlpha, R1Alpha, 
+           relevanceBetaR1, costWeight, scenario)) %>%
   left_join(empirical_3_summary, by = c("scenario", "answerType")) %>%
-  replace_na(list(human_prop = 0))
+  replace_na(list(human_prop = 0, prob = 0))
 
 JSD_3 <- model_human_3 %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
@@ -208,7 +196,7 @@ JSD_3 <- model_human_3 %>%
   ungroup()
 
 
-min_JSDs_3 <- JSD_3 %>%
+params_3_overall <- JSD_3 %>%
   group_by(policyAlpha, questionerAlpha, R1Alpha, 
            relevanceBetaR1, costWeight, scenario) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD val per scenario, not per answertype x scen
@@ -217,16 +205,12 @@ min_JSDs_3 <- JSD_3 %>%
            relevanceBetaR1, costWeight) %>%
   summarise(JSD = mean(JSD)) %>% # get one JSD per set of params
   ungroup() %>%
-  slice_min(n = 50, order_by = JSD)
+  slice_min(n = 1, order_by = JSD)
 
-params_3 <- min_JSDs_3 %>%
-  summarise(mean(policyAlpha), mean(questionerAlpha), mean(R1Alpha), mean(relevanceBetaR0),
-            mean(relevanceBetaR1), mean(costWeight))
-
-write_csv(params_3, here("03-current-models-webppl/data/params_case_study_3.csv"))
+write_csv(params_3_overall, here("03-current-models-webppl/data/params_case_study_3.csv"))
 ```
 
-```{r overall-2}
+```{r overall-2, eval = FALSE}
 empirical_2_summary_overall <- raw_empirical_responses_2 %>%
   filter(trial_type != "filler") %>%
   dplyr::mutate(
@@ -310,7 +294,7 @@ params_2_overall <- JSD_2_overall %>%
 write_csv(params_2_overall, here("03-current-models-webppl/data/params_case_study_2_overall.csv"))
 ```
 
-```{r overall-3}
+```{r overall-3, eval = FALSE}
 empirical_3_summary_overall <- raw_empirical_responses_3 %>%
   filter(category != 'yes') %>%
   filter(category != 'other') %>%
@@ -412,12 +396,26 @@ model_human_3_overall %>%
   theme(axis.text.x = element_text(angle 
                                    = 45, vjust = 1, hjust=1))
 
-model_human_3_overall %>%
-  filter(policyAlpha %in% params_3_overall$policyAlpha &
-         questionerAlpha %in% params_3_overall$questionerAlpha &
-         R1Alpha %in% params_3_overall$R1Alpha &
-         relevanceBetaR1 %in% params_3_overall$relevanceBetaR1 &
-         costWeight %in% params_3_overall$costWeight) %>%
+model_human_2 %>%
+  filter(policyAlpha %in% params_2$policyAlpha &
+         questionerAlpha %in% params_2$questionerAlpha &
+         R1Alpha %in% params_2$R1Alpha &
+         relevanceBetaR1 %in% params_2$relevanceBetaR1 &
+         costWeight %in% params_2$costWeight) %>%
+  select(answerType, prob, human_prop) %>%
+  pivot_longer(cols = c(prob, human_prop), names_to = "agent", values_to = "prop") %>%
+  ggplot(aes(x = agent, y = prop, fill = answerType)) +
+    geom_bar(position="stack", stat="identity") +
+  scale_x_discrete(drop = TRUE) +
+  theme(axis.text.x = element_text(angle 
+                                   = 45, vjust = 1, hjust=1))
+
+model_human_3 %>%
+  filter(policyAlpha %in% params_3$policyAlpha &
+         questionerAlpha %in% params_3$questionerAlpha &
+         R1Alpha %in% params_3$R1Alpha &
+         relevanceBetaR1 %in% params_3$relevanceBetaR1 &
+         costWeight %in% params_3$costWeight) %>%
   select(answerType, prob, human_prop) %>%
   pivot_longer(cols = c(prob, human_prop), names_to = "agent", values_to = "prop") %>%
   ggplot(aes(x = agent, y = prop, fill = answerType)) +

@@ -40,7 +40,8 @@ raw_empirical_responses_2 <- read_csv(url(urlfile))
 urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data/PragmaticQA-E1-priorElicitation-sliderRating-full_450_anonymized.csv"
 full_matrix_data_2 <- read_csv(url(urlfile))
 
-model_preds_2 <- read_csv(here('03-current-models-webppl/data/case_study_2_RSA_preds.csv'))
+urlfile = "https://raw.githubusercontent.com/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_2_RSA_preds.csv"
+model_preds_2 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e1_plotting_proportions.csv"
 llm_preds_2 <- read_csv(url(urlfile)) 
@@ -56,7 +57,8 @@ urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-
 priors_3 <- read_csv(url(urlfile))
 scenarios_3 <- unique(raw_empirical_responses_3$itemName)
 
-model_preds_3 <- read_csv(here('03-current-models-webppl/data/case_study_3_RSA_preds.csv'))
+urlfile = "https://media.githubusercontent.com/media/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_3_RSA_preds.csv"
+model_preds_3 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e2_plotting_proportions.csv"
 llm_preds_3 <- read_csv(url(urlfile))
