@@ -111,11 +111,17 @@ empiricalPrior <- function(scenario) {
 }
 
 # run samples in parallel 
-samples_each = 200 # 1000 for param search
+samples_each = 200 
 scenarios_rep = rep(scenarios, samples_each)
 n_samples = length(scenarios_rep)
 
 plan(multisession, workers = 100)
+
+param_search = FALSE
+
+if (param_search == TRUE) {
+  n_samples = nrow(param_space)
+}
 
 get_sample <- function(param_search = FALSE) {
   if (param_search == TRUE) {
@@ -142,5 +148,8 @@ get_sample <- function(param_search = FALSE) {
 
 priorPred <- get_sample(param_search = TRUE)
 
-write_feather(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.feather')
-#write_csv(priorPred, './03-current-models-webppl/data/case_study_2_RSA_preds.csv')
+if (param_search == TRUE) {
+  write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
+} else {
+  write_csv(priorPred, './03-current-models-webppl/data/case_study_2_RSA_preds.csv')
+}
