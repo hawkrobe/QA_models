@@ -83,12 +83,12 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 0, max = 2), # searched 0-10
-    'questionerAlpha'  = runif(1,min = 6, max = 8), # searched 0-10
-    'R1Alpha'          = runif(1,min = 8, max = 10), # searched 0-10
+    'policyAlpha'      = runif(1,min = 3, max = 3), # searched 0-10
+    'questionerAlpha'  = runif(1,min = 9, max = 9), # searched 0-10
+    'R1Alpha'          = runif(1,min = 7, max = 7), # searched 0-10
     'relevanceBetaR0'  = runif(1,min = 0, max = 0), # fixed at 0
-    'relevanceBetaR1'  = runif(1,min = 0.4, max = 0.6), # searched 0-1
-    'costWeight'       = runif(1,min = 1, max = 2), # searched 0-5
+    'relevanceBetaR1'  = runif(1,min = 0.1, max = 0.1), # searched 0-1
+    'costWeight'       = runif(1,min = 0.9, max = 0.9), # searched 0-1
     'questionCost'     = runif(1,min = 0, max = 0) # fixed at 0
   )
   return(params)
@@ -119,34 +119,30 @@ plan(multisession, workers = 100)
 
 param_search = FALSE
 
+
 if (param_search == TRUE) {
   n_samples = nrow(param_space)
 }
-
-get_sample <- function(param_search = FALSE) {
+priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
+  message('run ', i)
   if (param_search == TRUE) {
-    n_samples = nrow(param_space)
+    scenario <- param_space[i,]['scenarios'] %>% pull()
+    params <- param_space[i,] %>% select(-scenarios, -n_sample) %>% tibble()
+  } else {
+    scenario = scenarios_rep[i]
+    params <- priorSampleParams()
   }
-  priorPred <- furrr::future_map_dfr(1:n_samples, function(i) {
-    message('run ', i)
-    if (param_search == TRUE) {
-      scenario <- param_space[i,]['scenarios'] %>% pull()
-      params <- param_space[i,] %>% select(-scenarios, -n_sample) %>% tibble()
-    } else {
-      scenario = scenarios_rep[i]
-      params <- priorSampleParams()
-    }
-    utils  <- empiricalPrior(scenario)
-    out    <- tibble('run' = i) %>%
-      cbind(params) %>%
-      cbind(scenario) %>%
-      cbind(run_model_tso(params, utils))
-      return (out)
-  }, .progress = TRUE, .options = furrr_options(seed = 123))
-  return(priorPred)
-}
+  utils  <- empiricalPrior(scenario)
+  out    <- tibble('run' = i) %>%
+    cbind(params) %>%
+    cbind(scenario) %>%
+    cbind(run_model_tso(params, utils))
+    return (out)
+}, .progress = TRUE, .options = furrr_options(seed = 123))
+return(priorPred)
 
-priorPred <- get_sample(param_search = TRUE)
+
+
 
 if (param_search == TRUE) {
   write_csv(priorPred, './03-current-models-webppl/data/case_study_2_parameter_search.csv')
