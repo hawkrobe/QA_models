@@ -41,7 +41,7 @@ urlfile="https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-pr
 full_matrix_data_2 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_2_RSA_preds.csv"
-model_preds_2 <- read_csv(url(urlfile))
+model_preds_2 <- read_csv(here("03-current-models-webppl/data/case_study_2_RSA_preds.csv"))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e1_plotting_proportions.csv"
 llm_preds_2 <- read_csv(url(urlfile)) 
@@ -58,19 +58,17 @@ priors_3 <- read_csv(url(urlfile))
 scenarios_3 <- unique(raw_empirical_responses_3$itemName)
 
 urlfile = "https://media.githubusercontent.com/media/hawkrobe/QA_models/main/03-current-models-webppl/data/case_study_3_RSA_preds.csv"
-model_preds_3 <- read_csv(url(urlfile))
+model_preds_3 <- read_csv(here("03-current-models-webppl/data/case_study_3_RSA_preds.csv"))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/0a1a9da5ea616b142cba1f073f83ec4a0604c802/data%2Banalysis/data_PT/e2_plotting_proportions.csv"
 llm_preds_3 <- read_csv(url(urlfile))
 
 urlfile = "https://raw.githubusercontent.com/magpie-ea/magpie3-qa-overinfo-free-production/main/data%2Banalysis/data_PT/e2_llms_results.csv"
 all_llm_preds_3 <- read_csv(url(urlfile))
-
-
 ```
 
 ```{r data-cleaning}
-answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive', 'unclassified')
+answerOrder <- c('taciturn', 'competitor', 'same category', 'other category', 'most similar', 'exhaustive')
 
 # reformat full matrix data
 full_matrix_2 <- full_matrix_data_2 %>%
@@ -118,7 +116,9 @@ all_llm_preds_2 <- all_llm_preds_2 %>%
       category == NA_character_ ~ 'other response',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
-  )
+  ) %>%
+  filter(answerType != "other response") %>%
+  rename(scenario = itemName)
 
 all_llm_preds_3 <- all_llm_preds_3 %>%
   dplyr::mutate(
@@ -132,7 +132,9 @@ all_llm_preds_3 <- all_llm_preds_3 %>%
       category == NA_character_ ~ 'other response',
       .default = "other response"
     ) %>% factor(levels = answerOrder)
-  )
+  ) %>%
+  filter(answerType != "other response") %>%
+  rename(scenario = itemName)
 
 model_preds_2_summary <- model_preds_2 %>% 
   dplyr::group_by(scenario, support) %>% 
@@ -338,6 +340,7 @@ empirical_2_summary <- empirical_responses_2 %>%
          case_study = "case_study_2")
 
 rsa_preds_2_summary <- model_preds_2_summary %>%
+  filter(!is.na(answerType)) %>%
   group_by(answerType) %>%
   summarise(sum = sum(mean)) %>%
   ungroup() %>%
@@ -405,12 +408,26 @@ all_summary = rbind(empirical_2_summary, empirical_3_summary, llm_summary_2,
 ```
 
 ```{r paper-fig-plot}
-ggplot(all_summary, aes(x = agent, y = prop, fill = answerType)) +
+all_summary %>%
+  mutate(agent = factor(agent, labels = c("Human",
+                                          "RSA",
+                                          "Zero-shot\nMixtral instruct",
+                                          "Zero-shot\nLlama instruct",
+                                          "One-shot CoT\nMixtral instruct",
+                                          "One-shot CoT\nLlama instruct")),
+         case_study = factor(case_study, labels = c("Case study 2",
+                                                    "Case study 3"))) %>%
+  ggplot(aes(x = agent, y = prop, fill = answerType)) +
     geom_bar(position="stack", stat="identity") +
   scale_x_discrete(drop = TRUE) +
   facet_wrap(~case_study, scales = "free") +
+  ylab("Proportion of answer") +
+  xlab("") +
   theme(axis.text.x = element_text(angle 
-                                   = 45, vjust = 1, hjust=1))
+                                   = 45, vjust = 1, hjust=1),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(), panel.grid.major = element_blank(),
+        legend.title=element_blank())
 ```
 
 # Evaluate context-sensitivity
@@ -425,4 +442,215 @@ raw_empirical_responses_3 %>%
   summarize(mentioned_c1 = mean(mentioned_c1),
             mentioned_c2 = mean(mentioned_c2))  
   
+```
+
+
+```{r JSDs-2}
+empirical_2_summary <- raw_empirical_responses_2 %>%
+  filter(trial_type != "filler") %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>% 
+  filter(answerType != "other response") %>%
+  rename(scenario = itemName) %>%
+  group_by(scenario, answerType) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(human_prop = n/sum(n)) %>%
+  select(-n)
+
+scenarios_2_rep <- data.frame(scenario = rep_len(scenarios_2, 1000))
+scrambled_scenarios_2 <- data.frame(scenario = scenarios_2_rep$scenario, 
+                                    scrambled_scenario = sample(scenarios_2_rep$scenario)) %>%
+  mutate(run = 1:n())
+
+model_2 <- model_preds_2 %>%
+  select(scenario, support, prob) %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.sameCat" ~ 'same category',
+      support == "no.competitor+otherCat" ~ 'other response',
+      support == "no.otherCat" ~ 'other category',
+      support == "no.sameCat+otherCat" ~ 'other response',
+      support == "no.competitor+sameCat+otherCat" ~ 'exhaustive',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>%
+  filter(answerType != "other response",
+         answerType != "unclassified") %>%
+  filter(!is.na(answerType)) %>%
+  group_by(scenario, answerType) %>%
+  summarise(prob = sum(prob)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(prob = prob/sum(prob)) %>%
+  ungroup() %>%
+  complete(answerType, nesting(scenario)) 
+
+model_human_2 <- scrambled_scenarios_2 %>%
+  left_join(model_2, by = c("scenario")) %>%
+  left_join(empirical_2_summary, by = c("scenario", "answerType")) %>%
+  left_join(empirical_2_summary %>% rename(human_prop_scrambled = human_prop), 
+            by = c("scrambled_scenario" = "scenario", "answerType")) %>%
+  replace_na(list(human_prop = 0, human_prop_scrambled = 0, prob = 0)) 
+
+model_human_2 %>%
+  group_by(scenario, scrambled_scenario, run) %>%
+  summarise(sum_model = sum(prob),
+            sum_human = sum(human_prop),
+            sum_scrambled = sum(human_prop_scrambled))
+
+JSD_2 <- model_human_2 %>%
+  group_by(scenario, scrambled_scenario, run) %>%
+  mutate(JSD = JSD(rbind(prob, human_prop)),
+         JSD_scrambled = JSD(rbind(prob, human_prop_scrambled))) %>%
+  ungroup() 
+
+mean_JSD_2_human_model <- JSD_2 %>%
+  summarise(mean(JSD))
+
+mean_JSD_2_human_scrambled_model <- JSD_2 %>%
+  summarise(mean(JSD_scrambled))
+
+t.test(JSD_2$JSD, JSD_2$JSD_scrambled)
+
+```
+
+```{r JSDs-3}
+empirical_3_summary <- raw_empirical_responses_3 %>%
+  filter(category != 'yes') %>%
+  filter(category != 'other') %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      category == "taciturn" ~ 'taciturn',
+      category == "competitor" ~ 'competitor',
+      category == "sameCategory" ~ 'same category',
+      category == "mostSimilar" ~ 'most similar',
+      category == "fullList" ~ 'exhaustive',
+      category == "otherCategory" ~ 'other category',
+      category == NA_character_ ~ 'other response',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>% 
+  filter(answerType != "unclassified") %>%
+  rename(scenario = itemName) %>%
+  group_by(scenario, answerType) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(human_prop = n/sum(n)) %>%
+  select(-n)
+
+scenarios_3_rep <- data.frame(scenario = rep_len(scenarios_3, 1000))
+scrambled_scenarios_3 <- data.frame(scenario = scenarios_3_rep$scenario, 
+                                    scrambled_scenario = sample(scenarios_3_rep$scenario)) %>%
+  mutate(run = 1:n())
+
+model_3 <- model_preds_3 %>%
+  select(scenario, support, prob) %>%
+  filter(scenario %in% scenarios_3) %>%
+  dplyr::mutate(
+    answerType = dplyr::case_when(
+      support == "no.---" ~ 'taciturn',
+      support == "no.competitor" ~ 'competitor',
+      support == "no.mostSimilar" ~ 'most similar',
+      support == "no.sameCat" ~ 'same category',
+      support == "no.otherCat" ~ 'other category',
+      support == "no.competitor+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat" ~ 'same category',
+      support == "no.competitor+otherCat" ~ 'same category',
+      support == "no.sameCat+otherCat" ~ 'same category',
+      support == "no.sameCat+mostSimilar" ~ 'same category',
+      support == "no.otherCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat" ~ 'same category',
+      support == "no.competitor+sameCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+otherCat+mostSimilar" ~ 'same category',
+      support == "no.sameCat+otherCat+mostSimilar" ~ 'same category',
+      support == "no.competitor+sameCat+otherCat+mostSimilar" ~ 'exhaustive',
+      .default = "other response"
+    ) %>% factor(levels = answerOrder)
+  ) %>%
+  filter(answerType != "unclassified") %>%
+  group_by(scenario, answerType) %>%
+  summarise(prob = sum(prob)) %>%
+  ungroup() %>%
+  group_by(scenario) %>%
+  mutate(prob = prob/sum(prob)) %>%
+  ungroup() %>%
+  complete(answerType, nesting(scenario)) 
+
+model_human_3 <- scrambled_scenarios_3 %>%
+  left_join(model_3, by = c("scenario")) %>%
+  left_join(empirical_3_summary, by = c("scenario", "answerType")) %>%
+  left_join(empirical_3_summary %>% rename(human_prop_scrambled = human_prop), 
+            by = c("scrambled_scenario" = "scenario", "answerType")) %>%
+  replace_na(list(human_prop = 0, human_prop_scrambled = 0, prob = 0))
+
+model_human_3 %>% group_by(scenario, scrambled_scenario, run) %>%
+  summarise(model_prop = sum(prob),
+            human_prob = sum(human_prop),
+            human_prop_scrambled = sum(human_prop_scrambled))
+
+JSD_3 <- model_human_3 %>%
+  group_by(scenario, scrambled_scenario, run) %>%
+  mutate(JSD = JSD(rbind(prob, human_prop)),
+         JSD_scrambled = JSD(rbind(prob, human_prop_scrambled))) %>%
+  ungroup()
+
+mean_JSD_3_human_model <- JSD_3 %>%
+  summarise(mean(JSD))
+
+mean_JSD_3_human_scrambled_model <- JSD_3 %>%
+  summarise(mean(JSD_scrambled))
+
+t.test(JSD_3$JSD, JSD_3$JSD_scrambled)
+```
+
+```{r averages}
+model_human_2 %>%
+  group_by(answerType) %>%
+  summarise(model_prop = sum(prob), human_prop = sum(human_prop)) %>%
+  ungroup() %>%
+  mutate(model_prop = model_prop/sum(model_prop),
+         human_prop = human_prop/sum(human_prop))
+
+model_human_3 %>%
+  group_by(answerType) %>%
+  summarise(model_prop = sum(prob), human_prop = sum(human_prop)) %>%
+  ungroup() %>%
+  mutate(model_prop = model_prop/sum(model_prop),
+         human_prop = human_prop/sum(human_prop))
+```
+```{r JSDs-LLMs}
+llm_2_props <- all_llm_preds_2 %>%
+  filter(scenario %in% scenarios_2) %>%
+  mutate(model = paste(prompt, model, sep = "_")) %>%
+  group_by(model, scenario, answerType) %>%
+  count() %>%
+  ungroup() %>%
+  group_by(model, scenario) %>%
+  mutate(model_prop = n/sum(n)) %>%
+  select(-n) %>%
+  ungroup() %>%
+  pivot_wider(names_from = model, values_from = model_prop) %>%
+  rename(one_shot_cot_llama_instruct = `one-shot CoT_meta-llama/Meta-Llama-3-70B-Instruct`,
+         zero_shot_llama_instruct = `zero-shot_meta-llama/Meta-Llama-3-70B-Instruct`) %>%
+  select(scenario, answerType, one_shot_cot_llama_instruct, zero_shot_llama_instruct) %>%
+  replace_na(list(one_shot_cot_llama_instruct = 0, zero_shot_llama_instruct = 0))
+
+all_models_human <- model_2 %>%
+  left_join(empirical_2_summary, by = c("scenario", "answerType")) %>%
+  left_join(llm_summary_2, by = c("scenario", "answerType"))
 ```
